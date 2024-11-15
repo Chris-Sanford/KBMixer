@@ -1,7 +1,0 @@
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\obj\Debug\KBMixer.csproj.AssemblyReference.cache
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\obj\Debug\KBMixer.csproj.CoreCompileInputs.cache
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\bin\Debug\KBMixer.exe.config
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\bin\Debug\KBMixer.exe
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\bin\Debug\KBMixer.pdb
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\obj\Debug\KBMixer.exe
-C:\Users\DevUser\source\repos\KBMixer\KBMixer\obj\Debug\KBMixer.pdb
