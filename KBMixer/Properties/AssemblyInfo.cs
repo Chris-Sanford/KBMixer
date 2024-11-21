@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -6,13 +7,18 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("KBMixer")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Control app volumes with your keyboard and mouse.")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Aronias")]
 [assembly: AssemblyProduct("KBMixer")]
 [assembly: AssemblyCopyright("Copyright ©  2024")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
+
+/// <remarks>
+/// COM (Component Object Model) is a platform-independent, distributed, object-oriented system for creating binary software components that can interact. 
+/// COM components can be used in different environments and programming languages, making them versatile for various applications.
+/// </remarks>
 
 // Setting ComVisible to false makes the types in this assembly not visible
 // to COM components.  If you need to access a type in this assembly from
