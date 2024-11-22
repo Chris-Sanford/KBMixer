@@ -81,17 +81,28 @@ class Program
         Console.WriteLine($"    Session Identifier: {selectedSession.GetSessionIdentifier}");
         Console.WriteLine($"    Session Instance Identifier: {selectedSession.GetSessionInstanceIdentifier}"); // Can use this to identify session/app/process based on exe name
 
-        // Prompt user to enter a volume level to set for the selected session
-        Console.Write("Enter the volume level (0-100) to set for the selected session: ");
-        int volumeLevel;
-
-        while (!int.TryParse(Console.ReadLine(), out volumeLevel) || volumeLevel < 0 || volumeLevel > 100)
+        Console.WriteLine("Press 'U' to increase volume, 'D' to decrease volume, 'M' to mute/unmute.");
+        while (true)
         {
-            Console.WriteLine("Invalid volume level. Please enter a value between 0 and 100.");
-            Console.Write("Enter the volume level (0-100) to set for the selected session: ");
-        }
+            Console.WriteLine($"Volume: {selectedSession.SimpleAudioVolume.Volume}");
+            ConsoleKeyInfo keyInfo = Console.ReadKey(true);
+            string input = keyInfo.KeyChar.ToString().ToUpper();
 
-        // Set the volume level for the selected session
-        selectedSession.SimpleAudioVolume.Volume = volumeLevel / 100f;
+            switch (input)
+            {
+                case "U":
+                    selectedSession.SimpleAudioVolume.Volume += 0.01f;
+                    break;
+                case "D":
+                    selectedSession.SimpleAudioVolume.Volume -= 0.01f;
+                    break;
+                case "M":
+                    selectedSession.SimpleAudioVolume.Mute = !selectedSession.SimpleAudioVolume.Mute;
+                    break;
+                default:
+                    Console.WriteLine("Invalid input. Please try again.");
+                    break;
+            }
+        }
     }
 }
