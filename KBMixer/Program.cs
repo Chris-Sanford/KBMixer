@@ -17,9 +17,14 @@ namespace KBMixer
         [DllImport("user32.dll")]
         public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
-        public static IntPtr GetTaskbarHandle()
+        public static IntPtr GetAppToControl(string lpClassName, string lpWindowName)
         {
-            return FindWindow("Shell_TrayWnd", null);
+            IntPtr handle = FindWindow(lpClassName, lpWindowName);
+            if (handle == IntPtr.Zero)
+            {
+                throw new Exception("Failed to find the window.");
+            }
+            return handle;
         }
 
         public void VolumeUp(IntPtr handle)
@@ -43,7 +48,7 @@ namespace KBMixer
     {
         static void Main(string[] args)
         {
-            var handle = VolumeControl.GetTaskbarHandle();
+            var handle = VolumeControl.GetAppToControl("Shell_TrayWnd", null);
             var volumeControl = new VolumeControl();
 
             Console.WriteLine("Press U for VolumeUp, D for VolumeDown, M for Mute, or Enter to exit...");
