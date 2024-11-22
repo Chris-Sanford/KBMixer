@@ -1,82 +1,97 @@
 ﻿using System;
+using System.Linq;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using NAudio.CoreAudioApi;
+using System.Data;
 
-namespace KBMixer
+class Program
 {
-    public class VolumeControl
+    static void Main(string[] args)
     {
-        const int APPCOMMAND_VOLUME_MUTE = 0x80000;
-        const int APPCOMMAND_VOLUME_UP = 0xA0000;
-        const int APPCOMMAND_VOLUME_DOWN = 0x90000;
-        const int WM_APPCOMMAND = 0x319;
+        // Initialize the device enumerator
+        var enumerator = new MMDeviceEnumerator();
 
-        [DllImport("user32.dll")]
-        public static extern IntPtr SendMessageW(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+        // Enumerate the active (DeviceState.Active) audio output (DataFlow.Render) devices
+        var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active).ToList();
 
-        [DllImport("user32.dll")]
-        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        public static IntPtr GetAppToControl(string lpClassName, string lpWindowName)
+        // Print the index, ID, and name of each device
+        Console.WriteLine("Active Audio Output Devices:");
+        for (int i = 0; i < devices.Count; i++)
         {
-            IntPtr handle = FindWindow(lpClassName, lpWindowName);
-            if (handle == IntPtr.Zero)
+            Console.WriteLine($"[{i}] Device ID: {devices[i].ID}");
+            Console.WriteLine($"    Device Name: {devices[i].FriendlyName}");
+        }
+
+        // Prompt user to select a device by index and validate
+        int deviceIndex;
+        MMDevice selectedDevice = null;
+
+        while (selectedDevice == null)
+        {
+            Console.Write("Enter the index of the device you want to control: ");
+            if (!int.TryParse(Console.ReadLine(), out deviceIndex) || deviceIndex < 0 || deviceIndex >= devices.Count)
             {
-                throw new Exception("Failed to find the window.");
-            }
-            return handle;
-        }
-
-        public void VolumeUp(IntPtr handle)
-        {
-            SendMessageW(handle, WM_APPCOMMAND, handle, (IntPtr)APPCOMMAND_VOLUME_UP);
-        }
-
-        public void VolumeDown(IntPtr handle)
-        {
-            SendMessageW(handle, WM_APPCOMMAND, handle, (IntPtr)APPCOMMAND_VOLUME_DOWN);
-        }
-
-        public void Mute(IntPtr handle)
-        {
-            SendMessageW(handle, WM_APPCOMMAND, handle, (IntPtr)APPCOMMAND_VOLUME_MUTE);
-        }
-    }
-
-
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            var handle = VolumeControl.GetAppToControl("Shell_TrayWnd", null);
-            var volumeControl = new VolumeControl();
-
-            Console.WriteLine("Press U for VolumeUp, D for VolumeDown, M for Mute, or Enter to exit...");
-
-            while (true)
-            {
-                var key = Console.ReadKey().Key;
-
-                if (key == ConsoleKey.U)
-                {
-                    volumeControl.VolumeUp(handle);
-                }
-                else if (key == ConsoleKey.D)
-                {
-                    volumeControl.VolumeDown(handle);
-                }
-                else if (key == ConsoleKey.M)
-                {
-                    volumeControl.Mute(handle);
-                }
-                else if (key == ConsoleKey.Enter)
-                {
-                    break;
-                }
+                Console.WriteLine("Invalid device index.");
+                continue;
             }
 
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
+            selectedDevice = devices[deviceIndex];
         }
+
+        Console.WriteLine("Selected device: " + selectedDevice.FriendlyName);
+
+        // Get all Audio Sessions (applications playing audio) for the selected device
+        var sessions = selectedDevice.AudioSessionManager.Sessions;
+
+        // Print the index, ID, and display name of each session
+        Console.WriteLine("Audio Sessions:");
+        for (int i = 0; i < sessions.Count; i++)
+        {
+            Console.WriteLine(""); // Space out sessions for readability
+            Console.WriteLine($"[{i}] Session Process ID: {sessions[i].GetProcessID}");
+            Console.WriteLine($"    Session Display Name: {sessions[i].DisplayName}");
+            Console.WriteLine($"    Volume: {sessions[i].SimpleAudioVolume.Volume}");
+            Console.WriteLine($"    MasterPeakValue: {sessions[i].AudioMeterInformation.MasterPeakValue}");
+            Console.WriteLine($"    Session Identifier: {sessions[i].GetSessionIdentifier}");
+            Console.WriteLine($"    Session Instance Identifier: {sessions[i].GetSessionInstanceIdentifier}"); // Can use this to identify session/app/process based on exe name
+            Console.WriteLine($"    State: {sessions[i].State}");
+            Console.WriteLine($"    IconPath: {sessions[i].IconPath}"); // Could use this in the future in the GUI to show the icon of the application
+        }
+
+        // Prompt user to select a session and validate
+        int sessionIndex;
+        AudioSessionControl selectedSession = null;
+
+        while (selectedSession == null)
+        {
+            Console.Write("Enter the index of the session you want to control: ");
+            if (!int.TryParse(Console.ReadLine(), out sessionIndex) || sessionIndex < 0 || sessionIndex >= sessions.Count)
+            {
+                Console.WriteLine("Invalid session index.");
+                continue;
+            }
+
+            selectedSession = sessions[sessionIndex];
+        }
+
+        Console.WriteLine(); // Space out selected session for readability
+        Console.WriteLine("Selected session: ");
+        Console.WriteLine($"    Session Process ID: {selectedSession.GetProcessID}");
+        Console.WriteLine($"    Session Display Name: {selectedSession.DisplayName}");
+        Console.WriteLine($"    Session Identifier: {selectedSession.GetSessionIdentifier}");
+        Console.WriteLine($"    Session Instance Identifier: {selectedSession.GetSessionInstanceIdentifier}"); // Can use this to identify session/app/process based on exe name
+
+        // Prompt user to enter a volume level to set for the selected session
+        Console.Write("Enter the volume level (0-100) to set for the selected session: ");
+        int volumeLevel;
+
+        while (!int.TryParse(Console.ReadLine(), out volumeLevel) || volumeLevel < 0 || volumeLevel > 100)
+        {
+            Console.WriteLine("Invalid volume level. Please enter a value between 0 and 100.");
+            Console.Write("Enter the volume level (0-100) to set for the selected session: ");
+        }
+
+        // Set the volume level for the selected session
+        selectedSession.SimpleAudioVolume.Volume = volumeLevel / 100f;
     }
 }
