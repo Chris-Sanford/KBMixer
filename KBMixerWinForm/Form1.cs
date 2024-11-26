@@ -44,7 +44,7 @@ namespace KBMixerWinForm
 
                 for (int i = 0; i < sessions.Count; i++)
                 {
-                    appComboBox.Items.Add(sessions[i].DisplayName);
+                    appComboBox.Items.Add(sessions[i].GetSessionIdentifier);
                 }
             }
 
@@ -61,6 +61,23 @@ namespace KBMixerWinForm
             MMDeviceCollection devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
             selectedDevice = devices[deviceComboBox.SelectedIndex]; // Update the selected device object
             PopulateAudioOutputSessions();
+        }
+
+        private void appComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (appComboBox.SelectedIndex >= 0)
+            {
+                if (selectedDevice != null)
+                {
+                    AudioSessionManager sessionManager = selectedDevice.AudioSessionManager;
+                    var sessions = sessionManager.Sessions;
+
+                    if (appComboBox.SelectedIndex < sessions.Count)
+                    {
+                        selectedSession = sessions[appComboBox.SelectedIndex]; // Update the selected session object
+                    }
+                }
+            }
         }
 
         private void label1_Click(object sender, EventArgs e)
