@@ -32,6 +32,8 @@
             deviceLabel = new Label();
             appComboBox = new ComboBox();
             appLabel = new Label();
+            VolumeUp = new Button();
+            VolumeDown = new Button();
             SuspendLayout();
             // 
             // deviceComboBox
@@ -79,11 +81,33 @@
             appLabel.Text = "App";
             appLabel.Click += label2_Click;
             // 
+            // VolumeUp
+            // 
+            VolumeUp.Location = new Point(221, 64);
+            VolumeUp.Name = "VolumeUp";
+            VolumeUp.Size = new Size(88, 23);
+            VolumeUp.TabIndex = 4;
+            VolumeUp.Text = "VolumeUp";
+            VolumeUp.UseVisualStyleBackColor = true;
+            VolumeUp.Click += VolumeUpButton_Click;
+            // 
+            // VolumeDown
+            // 
+            VolumeDown.Location = new Point(221, 93);
+            VolumeDown.Name = "VolumeDown";
+            VolumeDown.Size = new Size(88, 23);
+            VolumeDown.TabIndex = 5;
+            VolumeDown.Text = "VolumeDown";
+            VolumeDown.UseVisualStyleBackColor = true;
+            VolumeDown.Click += VolumeDownButton_Click;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(VolumeDown);
+            Controls.Add(VolumeUp);
             Controls.Add(appLabel);
             Controls.Add(appComboBox);
             Controls.Add(deviceLabel);
@@ -100,5 +124,7 @@
         private Label deviceLabel;
         private ComboBox appComboBox;
         private Label appLabel;
+        private Button VolumeUp;
+        private Button VolumeDown;
     }
 }

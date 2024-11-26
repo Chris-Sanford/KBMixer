@@ -7,6 +7,7 @@ namespace KBMixerWinForm
     public partial class Form1 : Form
     {
         private MMDevice selectedDevice; // Store the selected device object in a class-level scope
+        private AudioSessionControl selectedSession; // Store the selected session object in a class-level scope
 
         public Form1()
         {
@@ -46,6 +47,12 @@ namespace KBMixerWinForm
                     appComboBox.Items.Add(sessions[i].DisplayName);
                 }
             }
+
+            if (appComboBox.Items.Count > 0)
+            {
+                appComboBox.SelectedIndex = 0; // Set the selected app to the first one in the index
+                selectedSession = selectedDevice.AudioSessionManager.Sessions[0]; // Set the selected session object
+            }
         }
 
         private void deviceComboBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -64,6 +71,22 @@ namespace KBMixerWinForm
         private void label2_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void VolumeUpButton_Click(object sender, EventArgs e)
+        {
+            if (selectedSession != null)
+            {
+                selectedSession.SimpleAudioVolume.Volume += 0.1f; // Increase the volume by 10%
+            }
+        }
+
+        private void VolumeDownButton_Click(object sender, EventArgs e)
+        {
+            if (selectedSession != null)
+            {
+                selectedSession.SimpleAudioVolume.Volume -= 0.1f; // Decrease the volume by 10%
+            }
         }
     }
 }
