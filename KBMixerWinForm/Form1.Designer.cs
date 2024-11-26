@@ -45,7 +45,7 @@
             deviceComboBox.FormattingEnabled = true;
             deviceComboBox.Location = new Point(60, 6);
             deviceComboBox.Name = "deviceComboBox";
-            deviceComboBox.Size = new Size(423, 23);
+            deviceComboBox.Size = new Size(728, 23);
             deviceComboBox.TabIndex = 0;
             deviceComboBox.SelectedIndexChanged += deviceComboBox_SelectedIndexChanged;
             // 
@@ -68,8 +68,9 @@
             appComboBox.FormattingEnabled = true;
             appComboBox.Location = new Point(60, 35);
             appComboBox.Name = "appComboBox";
-            appComboBox.Size = new Size(423, 23);
+            appComboBox.Size = new Size(728, 23);
             appComboBox.TabIndex = 2;
+            appComboBox.SelectedIndexChanged += appComboBox_SelectedIndexChanged;
             // 
             // appLabel
             // 
