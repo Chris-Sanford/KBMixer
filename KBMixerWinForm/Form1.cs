@@ -111,13 +111,16 @@ namespace KBMixerWinForm
         {
             if (selectedSession != null)
             {
-                if (e.Delta > 0)
+                if (Control.ModifierKeys == Keys.Control) // Check if the Control key is held
                 {
-                    selectedSession.SimpleAudioVolume.Volume += 0.05f;
-                }
-                else
-                {
-                    selectedSession.SimpleAudioVolume.Volume -= 0.05f;
+                    if (e.Delta > 0)
+                    {
+                        selectedSession.SimpleAudioVolume.Volume += 0.05f;
+                    }
+                    else
+                    {
+                        selectedSession.SimpleAudioVolume.Volume -= 0.05f;
+                    }
                 }
             }
         }
