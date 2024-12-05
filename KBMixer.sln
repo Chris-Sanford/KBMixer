@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KBMixerWinForm", "KBMixerWi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Global_Input", "Global_Input\Global_Input.csproj", "{1BB87950-AD06-4102-B3BF-A6FE10F9EC42}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RawGlobalInputGUI01", "RawGlobalInputGUI01\RawGlobalInputGUI01.csproj", "{51862ACC-FC2D-4CEE-9551-C3270FE80388}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{1BB87950-AD06-4102-B3BF-A6FE10F9EC42}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1BB87950-AD06-4102-B3BF-A6FE10F9EC42}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1BB87950-AD06-4102-B3BF-A6FE10F9EC42}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51862ACC-FC2D-4CEE-9551-C3270FE80388}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51862ACC-FC2D-4CEE-9551-C3270FE80388}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51862ACC-FC2D-4CEE-9551-C3270FE80388}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51862ACC-FC2D-4CEE-9551-C3270FE80388}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

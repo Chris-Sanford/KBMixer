@@ -28,12 +28,48 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Text = "Form1";
+            lastKeyPressed = new Label();
+            MouseWheelActivity = new Label();
+            SuspendLayout();
+            // 
+            // lastKeyPressed
+            // 
+            lastKeyPressed.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            lastKeyPressed.AutoSize = true;
+            lastKeyPressed.Location = new Point(46, 9);
+            lastKeyPressed.Name = "lastKeyPressed";
+            lastKeyPressed.Size = new Size(98, 15);
+            lastKeyPressed.TabIndex = 0;
+            lastKeyPressed.Text = "NoKeyPressedYet";
+            lastKeyPressed.TextAlign = ContentAlignment.MiddleCenter;
+            lastKeyPressed.Click += lastKeyPressed_Click;
+            // 
+            // MouseWheelActivity
+            // 
+            MouseWheelActivity.AutoSize = true;
+            MouseWheelActivity.Location = new Point(32, 41);
+            MouseWheelActivity.Name = "MouseWheelActivity";
+            MouseWheelActivity.Size = new Size(132, 15);
+            MouseWheelActivity.TabIndex = 1;
+            MouseWheelActivity.Text = "NoMouseWheelActivity";
+            MouseWheelActivity.Click += MouseWheelActivity_Click;
+            // 
+            // Form1
+            // 
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(193, 76);
+            Controls.Add(MouseWheelActivity);
+            Controls.Add(lastKeyPressed);
+            Name = "Form1";
+            Text = "Form1";
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
+
+        private Label lastKeyPressed;
+        private Label MouseWheelActivity;
     }
 }
