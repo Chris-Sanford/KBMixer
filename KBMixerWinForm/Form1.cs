@@ -13,6 +13,7 @@ namespace KBMixerWinForm
         {
             InitializeComponent();
             PopulateAudioOutputDevices();
+            this.MouseWheel += Form1_MouseWheel; // Subscribe to the MouseWheel event
         }
 
         private void PopulateAudioOutputDevices()
@@ -94,7 +95,7 @@ namespace KBMixerWinForm
         {
             if (selectedSession != null)
             {
-                selectedSession.SimpleAudioVolume.Volume += 0.1f; // Increase the volume by 10%
+                selectedSession.SimpleAudioVolume.Volume += 0.05f;
             }
         }
 
@@ -102,7 +103,25 @@ namespace KBMixerWinForm
         {
             if (selectedSession != null)
             {
-                selectedSession.SimpleAudioVolume.Volume -= 0.1f; // Decrease the volume by 10%
+                selectedSession.SimpleAudioVolume.Volume -= 0.05f;
+            }
+        }
+
+        private void Form1_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if (selectedSession != null)
+            {
+                if (Control.ModifierKeys == Keys.Control) // Check if the Control key is held
+                {
+                    if (e.Delta > 0)
+                    {
+                        selectedSession.SimpleAudioVolume.Volume += 0.05f;
+                    }
+                    else
+                    {
+                        selectedSession.SimpleAudioVolume.Volume -= 0.05f;
+                    }
+                }
             }
         }
     }
