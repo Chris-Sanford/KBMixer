@@ -1,4 +1,5 @@
 using NAudio.CoreAudioApi;
+using Linearstar.Windows.RawInput;
 
 namespace KBMixerWinForm
 {
@@ -6,14 +7,15 @@ namespace KBMixerWinForm
     // (created by the Windows Forms Designer) from the custom code defined here
     public partial class Form1 : Form
     {
-        private MMDevice selectedDevice; // Store the selected device object in a class-level scope
-        private AudioSessionControl selectedSession; // Store the selected session object in a class-level scope
+        // ? means it's a nullable type (to resolve warnings)
+        private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
+        private AudioSessionControl? selectedSession; // Store the selected session object in a class-level scope
 
         public Form1()
         {
             InitializeComponent();
             PopulateAudioOutputDevices();
-            this.MouseWheel += Form1_MouseWheel; // Subscribe to the MouseWheel event
+            PopulateAudioOutputSessions();
         }
 
         private void PopulateAudioOutputDevices()
@@ -26,12 +28,8 @@ namespace KBMixerWinForm
                 deviceComboBox.Items.Add(device.FriendlyName);
             }
 
-            if (deviceComboBox.Items.Count > 0)
-            {
-                deviceComboBox.SelectedIndex = 0;
-                selectedDevice = devices[0]; // Set the selected device object
-                PopulateAudioOutputSessions();
-            }
+            deviceComboBox.SelectedIndex = 0; // Set the selected device to the first one in the index
+            selectedDevice = devices[0]; // Set the selected device object
         }
 
         private void PopulateAudioOutputSessions()
@@ -47,12 +45,15 @@ namespace KBMixerWinForm
                 {
                     appComboBox.Items.Add(sessions[i].GetSessionIdentifier);
                 }
-            }
 
-            if (appComboBox.Items.Count > 0)
-            {
-                appComboBox.SelectedIndex = 0; // Set the selected app to the first one in the index
-                selectedSession = selectedDevice.AudioSessionManager.Sessions[0]; // Set the selected session object
+                if (appComboBox.Items.Count > 0)
+                {
+                    appComboBox.SelectedIndex = 0; // Set the selected app to the first one in the index
+                    if (selectedDevice.AudioSessionManager.Sessions.Count > 0)
+                    {
+                        selectedSession = selectedDevice.AudioSessionManager.Sessions[0]; // Set the selected session object
+                    }
+                }
             }
         }
 
