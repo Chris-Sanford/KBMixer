@@ -34,6 +34,7 @@
             appLabel = new Label();
             VolumeUp = new Button();
             VolumeDown = new Button();
+            btnHotkey = new Button();
             SuspendLayout();
             // 
             // deviceComboBox
@@ -57,7 +58,6 @@
             deviceLabel.Size = new Size(42, 15);
             deviceLabel.TabIndex = 1;
             deviceLabel.Text = "Device";
-            deviceLabel.Click += label1_Click;
             // 
             // appComboBox
             // 
@@ -80,11 +80,10 @@
             appLabel.Size = new Size(29, 15);
             appLabel.TabIndex = 3;
             appLabel.Text = "App";
-            appLabel.Click += label2_Click;
             // 
             // VolumeUp
             // 
-            VolumeUp.Location = new Point(221, 64);
+            VolumeUp.Location = new Point(700, 79);
             VolumeUp.Name = "VolumeUp";
             VolumeUp.Size = new Size(88, 23);
             VolumeUp.TabIndex = 4;
@@ -94,7 +93,7 @@
             // 
             // VolumeDown
             // 
-            VolumeDown.Location = new Point(221, 93);
+            VolumeDown.Location = new Point(700, 108);
             VolumeDown.Name = "VolumeDown";
             VolumeDown.Size = new Size(88, 23);
             VolumeDown.TabIndex = 5;
@@ -102,11 +101,22 @@
             VolumeDown.UseVisualStyleBackColor = true;
             VolumeDown.Click += VolumeDownButton_Click;
             // 
+            // btnHotkey
+            // 
+            btnHotkey.Location = new Point(60, 64);
+            btnHotkey.Name = "btnHotkey";
+            btnHotkey.Size = new Size(125, 23);
+            btnHotkey.TabIndex = 6;
+            btnHotkey.Text = "Set Hotkey";
+            btnHotkey.UseVisualStyleBackColor = true;
+            btnHotkey.Click += btnHotkey_Click;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 175);
+            Controls.Add(btnHotkey);
             Controls.Add(VolumeDown);
             Controls.Add(VolumeUp);
             Controls.Add(appLabel);
@@ -127,5 +137,6 @@
         private Label appLabel;
         private Button VolumeUp;
         private Button VolumeDown;
+        private Button btnHotkey;
     }
 }
