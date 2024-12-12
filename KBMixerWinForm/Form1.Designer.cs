@@ -35,6 +35,10 @@
             VolumeUp = new Button();
             VolumeDown = new Button();
             btnHotkey = new Button();
+            checkBoxControlSingleAppProcess = new CheckBox();
+            processIndexSelector = new NumericUpDown();
+            labelProcessIndex = new Label();
+            ((System.ComponentModel.ISupportInitialize)processIndexSelector).BeginInit();
             SuspendLayout();
             // 
             // deviceComboBox
@@ -46,7 +50,7 @@
             deviceComboBox.FormattingEnabled = true;
             deviceComboBox.Location = new Point(60, 6);
             deviceComboBox.Name = "deviceComboBox";
-            deviceComboBox.Size = new Size(728, 23);
+            deviceComboBox.Size = new Size(339, 23);
             deviceComboBox.TabIndex = 0;
             deviceComboBox.SelectedIndexChanged += deviceComboBox_SelectedIndexChanged;
             // 
@@ -68,7 +72,7 @@
             appComboBox.FormattingEnabled = true;
             appComboBox.Location = new Point(60, 35);
             appComboBox.Name = "appComboBox";
-            appComboBox.Size = new Size(728, 23);
+            appComboBox.Size = new Size(339, 23);
             appComboBox.TabIndex = 2;
             appComboBox.SelectedIndexChanged += appComboBox_SelectedIndexChanged;
             // 
@@ -83,7 +87,7 @@
             // 
             // VolumeUp
             // 
-            VolumeUp.Location = new Point(700, 79);
+            VolumeUp.Location = new Point(278, 64);
             VolumeUp.Name = "VolumeUp";
             VolumeUp.Size = new Size(88, 23);
             VolumeUp.TabIndex = 4;
@@ -93,7 +97,7 @@
             // 
             // VolumeDown
             // 
-            VolumeDown.Location = new Point(700, 108);
+            VolumeDown.Location = new Point(278, 93);
             VolumeDown.Name = "VolumeDown";
             VolumeDown.Size = new Size(88, 23);
             VolumeDown.TabIndex = 5;
@@ -111,11 +115,41 @@
             btnHotkey.UseVisualStyleBackColor = true;
             btnHotkey.Click += btnHotkey_Click;
             // 
+            // checkBoxControlSingleAppProcess
+            // 
+            checkBoxControlSingleAppProcess.AutoSize = true;
+            checkBoxControlSingleAppProcess.Location = new Point(60, 93);
+            checkBoxControlSingleAppProcess.Name = "checkBoxControlSingleAppProcess";
+            checkBoxControlSingleAppProcess.Size = new Size(169, 19);
+            checkBoxControlSingleAppProcess.TabIndex = 8;
+            checkBoxControlSingleAppProcess.Text = "Control Single App Process";
+            checkBoxControlSingleAppProcess.UseVisualStyleBackColor = true;
+            // 
+            // processIndexSelector
+            // 
+            processIndexSelector.Location = new Point(144, 118);
+            processIndexSelector.Name = "processIndexSelector";
+            processIndexSelector.Size = new Size(35, 23);
+            processIndexSelector.TabIndex = 9;
+            processIndexSelector.TextAlign = HorizontalAlignment.Center;
+            // 
+            // labelProcessIndex
+            // 
+            labelProcessIndex.AutoSize = true;
+            labelProcessIndex.Location = new Point(57, 120);
+            labelProcessIndex.Name = "labelProcessIndex";
+            labelProcessIndex.Size = new Size(81, 15);
+            labelProcessIndex.TabIndex = 10;
+            labelProcessIndex.Text = "Process Index:";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 175);
+            ClientSize = new Size(420, 175);
+            Controls.Add(labelProcessIndex);
+            Controls.Add(processIndexSelector);
+            Controls.Add(checkBoxControlSingleAppProcess);
             Controls.Add(btnHotkey);
             Controls.Add(VolumeDown);
             Controls.Add(VolumeUp);
@@ -125,6 +159,7 @@
             Controls.Add(deviceComboBox);
             Name = "Form1";
             Text = "KBMixer";
+            ((System.ComponentModel.ISupportInitialize)processIndexSelector).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -138,5 +173,8 @@
         private Button VolumeUp;
         private Button VolumeDown;
         private Button btnHotkey;
+        private CheckBox checkBoxControlSingleAppProcess;
+        private NumericUpDown processIndexSelector;
+        private Label labelProcessIndex;
     }
 }
