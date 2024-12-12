@@ -16,6 +16,7 @@ namespace KBMixerWinForm
         private const string keyUpCode = "Up";
         private const string up = "Up";
         private const string down = "Down";
+        private const string systemSoundsId = "{3.0.0.00000002}.{6C26BA7D-F0B2-4225-B422-8168C5261E45}|#";
 
         // Consider building a constant dictionary with all keys from this class
         // to represent hotkey in user-friendly way
@@ -25,10 +26,11 @@ namespace KBMixerWinForm
         // ? means it's a nullable type (to resolve warnings)
         private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
         private AudioSessionControl? selectedSession; // Store the selected session object in a class-level scope
+        private KBMixerSession[]? kbmixerSessions;
         private int hotkey;
         private bool listeningForHotkeySet = false;
         private bool hotkeyHeld = false;
-
+        
         public Form1()
         {
             InitializeComponent();
@@ -130,9 +132,9 @@ namespace KBMixerWinForm
                     //Debug.WriteLine("Mouse Last Y: " + mouseData.Mouse.LastY);
                 }
             }
-                base.WndProc(ref m); // Continue processing the message as WndProc normally would
+            base.WndProc(ref m); // Continue processing the message as WndProc normally would
         }
-    
+
 
         private void PopulateAudioOutputDevices()
         {
@@ -142,6 +144,18 @@ namespace KBMixerWinForm
             foreach (MMDevice device in devices)
             {
                 deviceComboBox.Items.Add(device.FriendlyName);
+                Debug.WriteLine("Device Audio Client: " + device.AudioClient);
+                Debug.WriteLine("FriendlyName: " + device.FriendlyName);
+                Debug.WriteLine("ID: " + device.ID);
+                Debug.WriteLine("State: " + device.State);
+                Debug.WriteLine("DataFlow: " + device.DataFlow);
+                Debug.WriteLine("DeviceFriendlyName: " + device.DeviceFriendlyName);
+                Debug.WriteLine("FriendlyName: " + device.FriendlyName);
+                Debug.WriteLine("IconPath: " + device.IconPath);
+                Debug.WriteLine("IsMuted: " + device.AudioEndpointVolume.Mute);
+                Debug.WriteLine("MasterVolumeLevel: " + device.AudioEndpointVolume.MasterVolumeLevel);
+                Debug.WriteLine("MasterVolumeLevelScalar: " + device.AudioEndpointVolume.MasterVolumeLevelScalar);
+                Debug.WriteLine("MasterPeakValue: " + device.AudioMeterInformation.MasterPeakValue);
             }
 
             deviceComboBox.SelectedIndex = 0; // Set the selected device to the first one in the index
@@ -159,7 +173,43 @@ namespace KBMixerWinForm
 
                 for (int i = 0; i < sessions.Count; i++)
                 {
-                    appComboBox.Items.Add(sessions[i].GetSessionIdentifier);
+                    // get the binary name of the session by getting the substring
+                    // between the last \ and the following %b from SessionInstanceIdentifier
+                    string SessionInstanceIdentifier = sessions[i].GetSessionInstanceIdentifier;
+                    string binaryName = SessionInstanceIdentifier.Substring(
+                        SessionInstanceIdentifier.LastIndexOf(@"\") + 1,
+                        SessionInstanceIdentifier.IndexOf(@"%b") - SessionInstanceIdentifier.LastIndexOf(@"\") - 1);
+
+                    if (binaryName == systemSoundsId)
+                    {
+                        binaryName = "System Sounds";
+                    }
+
+                    Debug.WriteLine("Binary Name: " + binaryName);
+
+                    // Try to acquire an object from kbmixerSession whose binaryName equals the current binaryName
+                    var existingSession = kbmixerSessions?.FirstOrDefault(s => s.BinaryName == binaryName);
+
+                    // If the object exists, add the session to the Sessions array of that object
+                    if (existingSession != null)
+                    {
+                        var sessionsList = existingSession.Sessions.ToList();
+                        sessionsList.Add(sessions[i]);
+                        existingSession.Sessions = sessionsList.ToArray();
+                    }
+                    else
+                    {
+                        var newSession = new KBMixerSession(binaryName, new AudioSessionControl[] { sessions[i] });
+                        var kbmixerSessionsList = kbmixerSessions?.ToList() ?? new List<KBMixerSession>();
+                        kbmixerSessionsList.Add(newSession);
+                        kbmixerSessions = kbmixerSessionsList.ToArray();
+                    }
+                }
+
+                // Add each binary name from the kbmixerSessions array to the appComboBox
+                foreach (var session in kbmixerSessions)
+                {
+                    appComboBox.Items.Add(session.BinaryName);
                 }
 
                 if (appComboBox.Items.Count > 0)
@@ -243,6 +293,11 @@ namespace KBMixerWinForm
             // Set a flag/variable to indicate that we are waiting for a key press
             // so that WndProc knows to process the key press
             listeningForHotkeySet = true;
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
