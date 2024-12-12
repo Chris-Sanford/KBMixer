@@ -32,8 +32,6 @@
             deviceLabel = new Label();
             appComboBox = new ComboBox();
             appLabel = new Label();
-            VolumeUp = new Button();
-            VolumeDown = new Button();
             btnHotkey = new Button();
             checkBoxControlSingleAppProcess = new CheckBox();
             processIndexSelector = new NumericUpDown();
@@ -85,26 +83,6 @@
             appLabel.TabIndex = 3;
             appLabel.Text = "App";
             // 
-            // VolumeUp
-            // 
-            VolumeUp.Location = new Point(278, 64);
-            VolumeUp.Name = "VolumeUp";
-            VolumeUp.Size = new Size(88, 23);
-            VolumeUp.TabIndex = 4;
-            VolumeUp.Text = "VolumeUp";
-            VolumeUp.UseVisualStyleBackColor = true;
-            VolumeUp.Click += VolumeUpButton_Click;
-            // 
-            // VolumeDown
-            // 
-            VolumeDown.Location = new Point(278, 93);
-            VolumeDown.Name = "VolumeDown";
-            VolumeDown.Size = new Size(88, 23);
-            VolumeDown.TabIndex = 5;
-            VolumeDown.Text = "VolumeDown";
-            VolumeDown.UseVisualStyleBackColor = true;
-            VolumeDown.Click += VolumeDownButton_Click;
-            // 
             // btnHotkey
             // 
             btnHotkey.Location = new Point(60, 64);
@@ -124,6 +102,7 @@
             checkBoxControlSingleAppProcess.TabIndex = 8;
             checkBoxControlSingleAppProcess.Text = "Control Single App Process";
             checkBoxControlSingleAppProcess.UseVisualStyleBackColor = true;
+            checkBoxControlSingleAppProcess.CheckedChanged += checkBoxControlSingleAppProcess_CheckedChanged;
             // 
             // processIndexSelector
             // 
@@ -151,8 +130,6 @@
             Controls.Add(processIndexSelector);
             Controls.Add(checkBoxControlSingleAppProcess);
             Controls.Add(btnHotkey);
-            Controls.Add(VolumeDown);
-            Controls.Add(VolumeUp);
             Controls.Add(appLabel);
             Controls.Add(appComboBox);
             Controls.Add(deviceLabel);
@@ -170,8 +147,6 @@
         private Label deviceLabel;
         private ComboBox appComboBox;
         private Label appLabel;
-        private Button VolumeUp;
-        private Button VolumeDown;
         private Button btnHotkey;
         private CheckBox checkBoxControlSingleAppProcess;
         private NumericUpDown processIndexSelector;
