@@ -16,7 +16,7 @@ namespace KBMixerWinForm
         private const string keyUpCode = "Up";
         private const string up = "Up";
         private const string down = "Down";
-        private const string systemSoundsId = "{3.0.0.00000002}.{6C26BA7D-F0B2-4225-B422-8168C5261E45}|#";
+        private const string systemSoundsId = "{6C26BA7D-F0B2-4225-B422-8168C5261E45}";
 
         // Consider building a constant dictionary with all keys from this class
         // to represent hotkey in user-friendly way
@@ -25,18 +25,83 @@ namespace KBMixerWinForm
 
         // ? means it's a nullable type (to resolve warnings)
         private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
-        private AudioSessionControl? selectedSession; // Store the selected session object in a class-level scope
-        private KBMixerSession[]? kbmixerSessions;
+        private bool appSelected = false;
+        private string selectedAppName; // To control per-app
+        private string selectedSessionInstanceIdentifier; // To control per-session/process
+        private KBMixerSession[]? kbMixerSessions; // to control per-app
+        private SessionCollection naudioSessions; // to control per-session/process
         private int hotkey;
         private bool listeningForHotkeySet = false;
         private bool hotkeyHeld = false;
-        
+        private bool controlSingleAppProcess = false;
+        private int indexOfProcessToControl = 0;
+
         public Form1()
         {
             InitializeComponent();
             PopulateAudioOutputDevices();
             PopulateAudioOutputSessions();
             RegisterRawInputDevices();
+        }
+
+        private void PopulateAudioOutputSessions()
+        {
+            appComboBox.Items.Clear();
+
+            if (selectedDevice != null) // Access the selected device object
+            {
+                // Get the complete list of audio sessions from the selected device
+                AudioSessionManager sessionManager = selectedDevice.AudioSessionManager;
+                naudioSessions = sessionManager.Sessions;
+
+                for (int i = 0; i < naudioSessions.Count; i++)
+                {
+                    // get the app name of the session by getting the substring
+                    // between the last \ and the following %b from SessionInstanceIdentifier
+                    string SessionInstanceIdentifier = naudioSessions[i].GetSessionInstanceIdentifier;
+                    string appName = SessionInstanceIdentifier.Substring(
+                        SessionInstanceIdentifier.LastIndexOf(@"\") + 1,
+                        SessionInstanceIdentifier.IndexOf(@"%b") - SessionInstanceIdentifier.LastIndexOf(@"\") - 1);
+
+                    if (appName.Contains(systemSoundsId))
+                    {
+                        appName = "System Sounds";
+                    }
+
+                    Debug.WriteLine("App Name: " + appName);
+
+                    // Try to acquire an object from kbmixerSession whose appName equals the current appName
+                    var existingSession = kbMixerSessions?.FirstOrDefault(s => s.AppName == appName);
+
+                    // If the object exists, add the session to the Sessions array of that object
+                    if (existingSession != null)
+                    {
+                        var sessionsList = existingSession.Sessions.ToList();
+                        sessionsList.Add(naudioSessions[i]);
+                        existingSession.Sessions = sessionsList.ToArray();
+                    }
+                    else
+                    {
+                        var newSession = new KBMixerSession(appName, new AudioSessionControl[] { naudioSessions[i] });
+                        var kbMixerSessionsList = kbMixerSessions?.ToList() ?? new List<KBMixerSession>();
+                        kbMixerSessionsList.Add(newSession);
+                        kbMixerSessions = kbMixerSessionsList.ToArray();
+                    }
+                }
+
+                // Add each app name from the kbMixerSessions array to the appComboBox
+                foreach (var session in kbMixerSessions)
+                {
+                    appComboBox.Items.Add(session.AppName);
+                }
+
+                if (appComboBox.Items.Count > 0)
+                {
+                    appComboBox.SelectedIndex = 0; // Set the selected app to the first one in the index
+                    selectedAppName = kbMixerSessions[0].AppName; // Set the selected app name
+                    selectedSessionInstanceIdentifier = naudioSessions[0].GetSessionInstanceIdentifier; // Set the selected session object
+                }
+            }
         }
 
         private void RegisterRawInputDevices()
@@ -47,16 +112,54 @@ namespace KBMixerWinForm
 
         private void AdjustSessionVolume(string direction, float increment)
         {
-            if (selectedSession != null)
+            Debug.WriteLine("Adjusting volume by: " + increment);
+            if (appSelected)
             {
-                if (direction == up)
+                // if controlSingleAppProcess is true, only adjust the volume of the selected session
+                if (controlSingleAppProcess)
                 {
-                    // Using Math.Min to ensure volume can reach 0 or 100 even if increment results in going over/under
-                    selectedSession.SimpleAudioVolume.Volume = Math.Min(1.0f, selectedSession.SimpleAudioVolume.Volume + increment);
+                    var session = naudioSessions[indexOfProcessToControl];
+                    if (session != null)
+                    {
+                        Debug.WriteLine("Adjusting volume of: " + session.GetSessionInstanceIdentifier);
+                        if (direction == up)
+                        {
+                            // Using Math.Min to ensure volume can reach 0 or 100 even if increment results in going over/under
+                            session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + increment);
+                        }
+                        else if (direction == down)
+                        {
+                            session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - increment);
+                        }
+                    }
                 }
-                else if (direction == down)
+                else // Adjust the volume of all sessions of the selected app
                 {
-                    selectedSession.SimpleAudioVolume.Volume = Math.Max(0.0f, selectedSession.SimpleAudioVolume.Volume - increment);
+                    // Loop through all sessions of the selected app
+                    for (int i = 0; i < naudioSessions.Count; i++)
+                    {
+                        var session = naudioSessions[i];
+                        string sessionAppName = session.GetSessionInstanceIdentifier.Substring(
+                            session.GetSessionInstanceIdentifier.LastIndexOf(@"\") + 1,
+                            session.GetSessionInstanceIdentifier.IndexOf(@"%b") - session.GetSessionInstanceIdentifier.LastIndexOf(@"\") - 1);
+
+                        if (sessionAppName.Contains(systemSoundsId))
+                        {
+                            sessionAppName = "System Sounds";
+                        }
+
+                        if (sessionAppName == selectedAppName)
+                        {
+                            if (direction == up)
+                            {
+                                session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + increment);
+                            }
+                            else if (direction == down)
+                            {
+                                session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - increment);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -116,13 +219,13 @@ namespace KBMixerWinForm
                     bool mouseWheelEvent = mouseData.Mouse.ButtonData == mouseWheelUp || mouseData.Mouse.ButtonData == mouseWheelDown;
 
                     // if hotkeyHeld is true, write debug output
-                    if (hotkeyHeld && mouseData.Mouse.ButtonData == mouseWheelUp && selectedSession != null)
+                    if (hotkeyHeld && mouseData.Mouse.ButtonData == mouseWheelUp && appSelected)
                     {
                         AdjustSessionVolume(up, volumeIncrement);
                         //Debug.WriteLine("Mouse Buttons: " + mouseData.Mouse.Buttons); // MouseWheel is the scroll wheel  
                         //Debug.WriteLine("Mouse Button Data: " + mouseData.Mouse.ButtonData); // 120 is up, -120 is down  
                     }
-                    else if (hotkeyHeld && mouseData.Mouse.ButtonData == mouseWheelDown && selectedSession != null)
+                    else if (hotkeyHeld && mouseData.Mouse.ButtonData == mouseWheelDown && appSelected)
                     {
                         AdjustSessionVolume(down, volumeIncrement);
                     }
@@ -160,68 +263,10 @@ namespace KBMixerWinForm
 
             deviceComboBox.SelectedIndex = 0; // Set the selected device to the first one in the index
             selectedDevice = devices[0]; // Set the selected device object
+            appSelected = true;
         }
 
-        private void PopulateAudioOutputSessions()
-        {
-            appComboBox.Items.Clear();
-
-            if (selectedDevice != null) // Access the selected device object
-            {
-                AudioSessionManager sessionManager = selectedDevice.AudioSessionManager;
-                var sessions = sessionManager.Sessions;
-
-                for (int i = 0; i < sessions.Count; i++)
-                {
-                    // get the binary name of the session by getting the substring
-                    // between the last \ and the following %b from SessionInstanceIdentifier
-                    string SessionInstanceIdentifier = sessions[i].GetSessionInstanceIdentifier;
-                    string binaryName = SessionInstanceIdentifier.Substring(
-                        SessionInstanceIdentifier.LastIndexOf(@"\") + 1,
-                        SessionInstanceIdentifier.IndexOf(@"%b") - SessionInstanceIdentifier.LastIndexOf(@"\") - 1);
-
-                    if (binaryName == systemSoundsId)
-                    {
-                        binaryName = "System Sounds";
-                    }
-
-                    Debug.WriteLine("Binary Name: " + binaryName);
-
-                    // Try to acquire an object from kbmixerSession whose binaryName equals the current binaryName
-                    var existingSession = kbmixerSessions?.FirstOrDefault(s => s.BinaryName == binaryName);
-
-                    // If the object exists, add the session to the Sessions array of that object
-                    if (existingSession != null)
-                    {
-                        var sessionsList = existingSession.Sessions.ToList();
-                        sessionsList.Add(sessions[i]);
-                        existingSession.Sessions = sessionsList.ToArray();
-                    }
-                    else
-                    {
-                        var newSession = new KBMixerSession(binaryName, new AudioSessionControl[] { sessions[i] });
-                        var kbmixerSessionsList = kbmixerSessions?.ToList() ?? new List<KBMixerSession>();
-                        kbmixerSessionsList.Add(newSession);
-                        kbmixerSessions = kbmixerSessionsList.ToArray();
-                    }
-                }
-
-                // Add each binary name from the kbmixerSessions array to the appComboBox
-                foreach (var session in kbmixerSessions)
-                {
-                    appComboBox.Items.Add(session.BinaryName);
-                }
-
-                if (appComboBox.Items.Count > 0)
-                {
-                    appComboBox.SelectedIndex = 0; // Set the selected app to the first one in the index
-                    if (selectedDevice.AudioSessionManager.Sessions.Count > 0)
-                    {
-                        selectedSession = selectedDevice.AudioSessionManager.Sessions[0]; // Set the selected session object
-                    }
-                }
-            }
-        }
+        
 
         private void deviceComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -233,53 +278,8 @@ namespace KBMixerWinForm
 
         private void appComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (appComboBox.SelectedIndex >= 0)
-            {
-                if (selectedDevice != null)
-                {
-                    AudioSessionManager sessionManager = selectedDevice.AudioSessionManager;
-                    var sessions = sessionManager.Sessions;
-
-                    if (appComboBox.SelectedIndex < sessions.Count)
-                    {
-                        selectedSession = sessions[appComboBox.SelectedIndex]; // Update the selected session object
-                    }
-                }
-            }
-        }
-
-        private void VolumeUpButton_Click(object sender, EventArgs e)
-        {
-            if (selectedSession != null)
-            {
-                selectedSession.SimpleAudioVolume.Volume += 0.01f;
-            }
-        }
-
-        private void VolumeDownButton_Click(object sender, EventArgs e)
-        {
-            if (selectedSession != null)
-            {
-                selectedSession.SimpleAudioVolume.Volume -= 0.01f;
-            }
-        }
-
-        private void Form1_MouseWheel(object sender, MouseEventArgs e)
-        {
-            if (selectedSession != null)
-            {
-                if (Control.ModifierKeys == Keys.Control) // Check if the Control key is held
-                {
-                    if (e.Delta > 0)
-                    {
-                        selectedSession.SimpleAudioVolume.Volume += 0.05f;
-                    }
-                    else
-                    {
-                        selectedSession.SimpleAudioVolume.Volume -= 0.05f;
-                    }
-                }
-            }
+            selectedAppName = kbMixerSessions[appComboBox.SelectedIndex].AppName; // Update the selected app name
+            selectedSessionInstanceIdentifier = kbMixerSessions[appComboBox.SelectedIndex].Sessions[0].GetSessionInstanceIdentifier; // Update the selected session object
         }
 
         private void btnHotkey_Click(object sender, EventArgs e)
@@ -295,9 +295,15 @@ namespace KBMixerWinForm
             listeningForHotkeySet = true;
         }
 
-        private void label1_Click(object sender, EventArgs e)
+        private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
         {
+            controlSingleAppProcess = checkBoxControlSingleAppProcess.Checked;
+            if (controlSingleAppProcess) {
+                indexOfProcessToControl = (int)processIndexSelector.Value;
+            }
 
+            Debug.WriteLine("Control Single App Process: " + controlSingleAppProcess);
+            Debug.WriteLine("Index of Process to Control: " + indexOfProcessToControl);
         }
     }
 }
