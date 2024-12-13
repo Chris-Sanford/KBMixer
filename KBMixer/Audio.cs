@@ -1,4 +1,3 @@
-using Linearstar.Windows.RawInput;
 using NAudio.CoreAudioApi;
 using System.Diagnostics;
 using System.Reflection.Metadata;
@@ -53,10 +52,10 @@ namespace KBMixer
     // these are methods that are used to build AudioApp objects
     public static class Audio 
     {
-        private const Single volumeIncrement = 0.05f;
-        private const string up = "Up";
-        private const string down = "Down";
-        private const string systemSoundsId = "{6C26BA7D-F0B2-4225-B422-8168C5261E45}";
+        public const Single volumeIncrement = 0.05f;
+        public const string up = "Up";
+        public const string down = "Down";
+        public const string systemSoundsId = "{6C26BA7D-F0B2-4225-B422-8168C5261E45}";
 
         //private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
         //private string selectedAppName; // To control per-app
@@ -126,11 +125,7 @@ namespace KBMixer
         //    }
         //}
 
-        //private void RegisterRawInputDevices()
-        //{
-        //    RawInputDevice.RegisterDevice(HidUsageAndPage.Keyboard, RawInputDeviceFlags.InputSink, Handle);
-        //    RawInputDevice.RegisterDevice(HidUsageAndPage.Mouse, RawInputDeviceFlags.InputSink, Handle);
-        //}
+
 
         //private void AdjustSessionVolume(string direction, float increment)
         //{

@@ -1,5 +1,4 @@
 using Linearstar.Windows.RawInput;
-using NAudio.CoreAudioApi;
 using System.Diagnostics;
 
 namespace KBMixer
@@ -7,64 +6,74 @@ namespace KBMixer
     public partial class Form1 : Form
     {
         private const int WM_INPUT = 0x00FF;
+        public const int mouseWheelUp = 120;
+        public const int mouseWheelDown = -120;
+        public const string up = "Up";
+        public const string down = "Down";
+        public const string mouseWheelButton = "MouseWheel";
+
+        public int hotkey;
+        public bool listeningForHotkeySet = false;
+        public bool hotkeyHeld = false;
 
         public Form1()
         {
             InitializeComponent();
+            RawInputDevice.RegisterDevice(HidUsageAndPage.Keyboard, RawInputDeviceFlags.InputSink, Handle);
+            RawInputDevice.RegisterDevice(HidUsageAndPage.Mouse, RawInputDeviceFlags.InputSink, Handle);
+        }
+
+        public void RegisterRawInputDevices()
+        {
+            RawInputDevice.RegisterDevice(HidUsageAndPage.Keyboard, RawInputDeviceFlags.InputSink, Handle);
+            RawInputDevice.RegisterDevice(HidUsageAndPage.Mouse, RawInputDeviceFlags.InputSink, Handle);
         }
 
         // override the original WndProc method to process raw input messages
         // in a way that serves our purposes, then call the base method at the end
         protected override void WndProc(ref Message m)
         {
-            //// If the message is a raw input message, process it
-            //if (m.Msg == WM_INPUT)
-            //{
-            //    // get the raw input data based on the handle from the message sent to WndProc
-            //    var data = RawInputData.FromHandle(m.LParam);
+            // If the message is a raw input message, process it
+            if (m.Msg == WM_INPUT)
+            {
+                Debug.WriteLine("An input event happened.");
+                // get the raw input data based on the handle from the message sent to WndProc
+                var data = RawInputData.FromHandle(m.LParam);
 
-            //    if (data is RawInputKeyboardData keyboardData)
-            //    {
-            //        int virtualKey = keyboardData.Keyboard.VirutalKey;
-            //        bool keyUp = keyboardData.Keyboard.Flags.ToString() == keyUpCode; // gotta be a better way to do this
+                if (data is RawInputKeyboardData keyboardData)
+                {
+                    int virtualKey = keyboardData.Keyboard.VirutalKey;
+                    bool keyUp = keyboardData.Keyboard.Flags.ToString() == up; // gotta be a better way to do this
 
-            //        if (listeningForHotkeySet)
-            //        {
-            //            listeningForHotkeySet = false; // prevent double-triggering conditional code block by immediately stop listening
-            //            btnHotkey.Enabled = true; // re-enable the button to allow the hotkey to be changed
-            //            btnHotkey.Text = ((Keys)virtualKey).ToString(); // rep button press with key name
-            //            hotkey = virtualKey; // set the hotkey to be used for volume control
-            //        }
+                    if (listeningForHotkeySet)
+                    {
+                        listeningForHotkeySet = false; // prevent double-triggering conditional code block by immediately stop listening
+                        btnHotkey.Enabled = true; // re-enable the button to allow the hotkey to be changed
+                        btnHotkey.Text = ((Keys)virtualKey).ToString(); // rep button press with key name
+                        hotkey = virtualKey; // set the hotkey to be used for volume control
+                    }
 
-            //        // If Input from Keyboard and Flags = None, key was pressed down
-            //        // If Input from Keyboard and Flags = Up, key was released
-            //        // If hotkey was pressed down, set hotkeyHeld to true
+                    // If Input from Keyboard and Flags = None, key was pressed down
+                    // If Input from Keyboard and Flags = Up, key was released
+                    // If hotkey was pressed down, set hotkeyHeld to true
 
-            //        if (virtualKey == hotkey && keyUp == false)
-            //        {
-            //            hotkeyHeld = true;
-            //        }
-            //        else
-            //        {
-            //            hotkeyHeld = false;
-            //        }
-            //    }
-            //    else if (data is RawInputMouseData mouseData)
-            //    {
-            //        bool isMouseWheel = mouseData.Mouse.Buttons.ToString() == mouseWheelButton; // gotta be a better way to do this
-            //        bool mouseWheelEvent = mouseData.Mouse.ButtonData == mouseWheelUp || mouseData.Mouse.ButtonData == mouseWheelDown;
+                    if (virtualKey == hotkey && keyUp == false)
+                    {
+                        hotkeyHeld = true;
+                    }
+                    else
+                    {
+                        hotkeyHeld = false;
+                    }
+                }
+                else if (data is RawInputMouseData mouseData)
+                {
+                    bool isMouseWheel = mouseData.Mouse.Buttons.ToString() == mouseWheelButton; // gotta be a better way to do this
+                    bool mouseWheelEvent = mouseData.Mouse.ButtonData == mouseWheelUp || mouseData.Mouse.ButtonData == mouseWheelDown;
 
-            //        // if hotkeyHeld is true, write debug output
-            //        if (hotkeyHeld && mouseData.Mouse.ButtonData == mouseWheelUp && appSelected)
-            //        {
-            //            AdjustSessionVolume(up, volumeIncrement);
-            //        }
-            //        else if (hotkeyHeld && mouseData.Mouse.ButtonData == mouseWheelDown && appSelected)
-            //        {
-            //            AdjustSessionVolume(down, volumeIncrement);
-            //        }
-            //    }
-            //}
+                    Debug.WriteLine("A mouse input happened.");
+                }
+            }
             base.WndProc(ref m); // Continue processing the message as WndProc normally would
         }
 
