@@ -1,4 +1,4 @@
-﻿namespace KBMixerWinForm
+﻿namespace KBMixer
 {
     partial class Form1
     {

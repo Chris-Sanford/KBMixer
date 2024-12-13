@@ -1,4 +1,4 @@
-namespace KBMixerWinForm
+namespace KBMixer
 {
     internal static class Program
     {
