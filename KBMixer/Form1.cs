@@ -12,15 +12,23 @@ namespace KBMixer
         public const string down = "Down";
         public const string mouseWheelButton = "MouseWheel";
 
-        public int hotkey;
-        public bool listeningForHotkeySet = false;
+        public Config currentConfig; // Current Configuration of the Application
+        public int[] hotkeyVirtualKeys = Array.Empty<int>(); // Array of Hotkeys to Listen For
         public bool hotkeyHeld = false;
+        public bool listeningForHotkeySet = false;
 
         public Form1()
         {
             InitializeComponent();
-            RawInputDevice.RegisterDevice(HidUsageAndPage.Keyboard, RawInputDeviceFlags.InputSink, Handle);
-            RawInputDevice.RegisterDevice(HidUsageAndPage.Mouse, RawInputDeviceFlags.InputSink, Handle);
+            RegisterRawInputDevices();
+
+            // For Testing Purposes
+            currentConfig = new Config
+            {
+                DeviceId = "defaultDeviceId",
+                AppFileName = "defaultAppFileName",
+                Hotkeys = Array.Empty<int>()
+            }; // Create an instance of the Config class
         }
 
         public void RegisterRawInputDevices()
@@ -36,32 +44,29 @@ namespace KBMixer
             // If the message is a raw input message, process it
             if (m.Msg == WM_INPUT)
             {
-                Debug.WriteLine("An input event happened.");
                 // get the raw input data based on the handle from the message sent to WndProc
                 var data = RawInputData.FromHandle(m.LParam);
 
                 if (data is RawInputKeyboardData keyboardData)
                 {
-                    int virtualKey = keyboardData.Keyboard.VirutalKey;
+                    int virtualKey = keyboardData.Keyboard.VirutalKey; // Notice this typo in RawInput... Virutal not Virtual
                     bool keyUp = keyboardData.Keyboard.Flags.ToString() == up; // gotta be a better way to do this
 
+                    // if we're looking to set the hot key, not adjust volume
                     if (listeningForHotkeySet)
                     {
                         listeningForHotkeySet = false; // prevent double-triggering conditional code block by immediately stop listening
                         btnHotkey.Enabled = true; // re-enable the button to allow the hotkey to be changed
-                        btnHotkey.Text = ((Keys)virtualKey).ToString(); // rep button press with key name
-                        hotkey = virtualKey; // set the hotkey to be used for volume control
+                        btnHotkey.Text = ((Keys)virtualKey).ToString(); // represent button press with friendly key name
+                        hotkeyVirtualKeys = hotkeyVirtualKeys.Append(virtualKey).ToArray(); // set the hotkey to be used for volume control
                     }
 
-                    // If Input from Keyboard and Flags = None, key was pressed down
-                    // If Input from Keyboard and Flags = Up, key was released
-                    // If hotkey was pressed down, set hotkeyHeld to true
-
-                    if (virtualKey == hotkey && keyUp == false)
+                    // If the key was pressed down (Flags = None) and the key is in the array of hotkeys
+                    if (hotkeyVirtualKeys.Contains(virtualKey) && keyUp == false)
                     {
                         hotkeyHeld = true;
                     }
-                    else
+                    else // If the key was released (Flags = Up)
                     {
                         hotkeyHeld = false;
                     }
@@ -69,9 +74,16 @@ namespace KBMixer
                 else if (data is RawInputMouseData mouseData)
                 {
                     bool isMouseWheel = mouseData.Mouse.Buttons.ToString() == mouseWheelButton; // gotta be a better way to do this
-                    bool mouseWheelEvent = mouseData.Mouse.ButtonData == mouseWheelUp || mouseData.Mouse.ButtonData == mouseWheelDown;
+                    bool wasUpOrDown = mouseData.Mouse.ButtonData == mouseWheelUp || mouseData.Mouse.ButtonData == mouseWheelDown; // ensure to not capture wheel button presses
 
-                    Debug.WriteLine("A mouse input happened.");
+                    // If the mouse input was a scroll up or down
+                    if (isMouseWheel && wasUpOrDown)
+                    {
+                        // WORK IN PROGRESS wip WIP
+                        // Identify the audio app associated to the held hotkey(s)
+
+                        // Adjust the volume of the audio app (or the specified session) based on scroll direction
+                    }
                 }
             }
             base.WndProc(ref m); // Continue processing the message as WndProc normally would
@@ -93,24 +105,37 @@ namespace KBMixer
 
         private void btnHotkey_Click(object sender, EventArgs e)
         {
-            //// Update the button text to say "Press a key..."  
-            //btnHotkey.Text = "Press a key...";
+            // Update the button text to say "Press a key..."  
+            btnHotkey.Text = "Press a key...";
 
-            //// Disable the button so the function can't be called again until the hotkey is set  
-            //btnHotkey.Enabled = false;
+            // Disable the button so the function can't be called again until the hotkey is set  
+            btnHotkey.Enabled = false;
 
-            //// Set a flag/variable to indicate that we are waiting for a key press
-            //// so that WndProc knows to process the key press
-            //listeningForHotkeySet = true;
+            // Set a flag/variable to indicate that we are waiting for a key press
+            // so that WndProc knows to process the key press
+            listeningForHotkeySet = true;
         }
 
         private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
         {
-            //controlSingleAppProcess = checkBoxControlSingleAppProcess.Checked;
-            //if (controlSingleAppProcess)
-            //{
-            //    indexOfProcessToControl = (int)processIndexSelector.Value;
-            //}
+            currentConfig.ControlSingleSession = checkBoxControlSingleAppProcess.Checked;
+            if (currentConfig.ControlSingleSession)
+            {
+                processIndexSelector.Enabled = true;
+                currentConfig.ProcessIndex = (int)processIndexSelector.Value;
+            }
+            else
+            {
+                processIndexSelector.Enabled = false;
+            }
+
+            // Write all properties of the Config class to debug output
+            Debug.WriteLine($"ConfigId: {currentConfig.ConfigId}");
+            Debug.WriteLine($"DeviceId: {currentConfig.DeviceId}");
+            Debug.WriteLine($"AppFileName: {currentConfig.AppFileName}");
+            Debug.WriteLine($"Hotkeys: {currentConfig.Hotkeys}");
+            Debug.WriteLine($"ControlSingleSession: {currentConfig.ControlSingleSession}");
+            Debug.WriteLine($"ProcessIndex: {currentConfig.ProcessIndex}");
         }
     }
 }

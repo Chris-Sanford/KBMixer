@@ -106,6 +106,7 @@
             // 
             // processIndexSelector
             // 
+            processIndexSelector.Enabled = false;
             processIndexSelector.Location = new Point(144, 118);
             processIndexSelector.Name = "processIndexSelector";
             processIndexSelector.Size = new Size(35, 23);
