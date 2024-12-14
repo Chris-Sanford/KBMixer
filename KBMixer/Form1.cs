@@ -51,6 +51,11 @@ namespace KBMixer
                 configs = new Config[] { defaultConfig };
             }
 
+            currentConfig = configs[0]; // Set the current config to the first config
+
+            // TEST: Save Config to Disk
+            configs[0].SaveConfig();
+
             // Populate Configs into GUI
             PopulateConfigs();
 
@@ -63,7 +68,7 @@ namespace KBMixer
 
 
             PopulateAudioDevices();
-            PopulateAudioApps();
+            
         }
 
         public void RegisterRawInputDevices()
@@ -162,27 +167,12 @@ namespace KBMixer
             deviceComboBox.SelectedIndex = selectedIndex;
         }
 
-        private void PopulateAudioApps()
-        {
-            // Update this so it only populates audio apps pertaining to the selected device / current config
-            // Clear the combo box
-            appComboBox.Items.Clear();
-            // Loop through all audio apps
-            foreach (var app in audioApps)
-            {
-                // Add each app to the combo box
-                appComboBox.Items.Add(app.AppFriendlyName);
-            }
 
-            // Add the app from the current config to the combo box
-            appComboBox.SelectedIndex = 0;
-        }
 
         private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
         {
             currentConfig = configs[comboBoxConfig.SelectedIndex]; // Update the current config object
             PopulateAudioDevices();
-            PopulateAudioApps();
         }
 
         private void deviceComboBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -287,10 +277,15 @@ namespace KBMixer
         {
             currentConfig.SaveConfig();
         }
-        private void checkBoxSetAppManual_CheckedChanged(object sender, EventArgs e)
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
         {
-            textBoxAppManual.ReadOnly = !checkBoxSetAppManual.Checked;
-            appComboBox.Enabled = !checkBoxSetAppManual.Checked;
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

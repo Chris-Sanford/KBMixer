@@ -30,7 +30,6 @@
         {
             deviceComboBox = new ComboBox();
             deviceLabel = new Label();
-            appComboBox = new ComboBox();
             appLabel = new Label();
             checkBoxControlSingleAppProcess = new CheckBox();
             processIndexSelector = new NumericUpDown();
@@ -42,11 +41,11 @@
             buttonHotkeyAdd = new Button();
             buttonHotkeyReset = new Button();
             labelControlSingleAppProcess = new Label();
-            checkBoxSetAppManual = new CheckBox();
-            textBoxAppManual = new TextBox();
             buttonSaveConfig = new Button();
             buttonRefresh = new Button();
             buttonDeleteConfig = new Button();
+            textBoxAppSelected = new TextBox();
+            buttonAppManualSet = new Button();
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).BeginInit();
             SuspendLayout();
             // 
@@ -57,7 +56,7 @@
             deviceComboBox.AccessibleRole = AccessibleRole.ComboBox;
             deviceComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
             deviceComboBox.FormattingEnabled = true;
-            deviceComboBox.Location = new Point(63, 33);
+            deviceComboBox.Location = new Point(56, 33);
             deviceComboBox.Name = "deviceComboBox";
             deviceComboBox.Size = new Size(275, 23);
             deviceComboBox.TabIndex = 0;
@@ -72,20 +71,6 @@
             deviceLabel.TabIndex = 1;
             deviceLabel.Text = "Device";
             // 
-            // appComboBox
-            // 
-            appComboBox.AccessibleDescription = "App";
-            appComboBox.AccessibleName = "App";
-            appComboBox.AccessibleRole = AccessibleRole.ComboBox;
-            appComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            appComboBox.FormattingEnabled = true;
-            appComboBox.Location = new Point(63, 62);
-            appComboBox.Name = "appComboBox";
-            appComboBox.Size = new Size(172, 23);
-            appComboBox.TabIndex = 2;
-            appComboBox.UseWaitCursor = true;
-            appComboBox.SelectedIndexChanged += appComboBox_SelectedIndexChanged;
-            // 
             // appLabel
             // 
             appLabel.AutoSize = true;
@@ -98,7 +83,7 @@
             // checkBoxControlSingleAppProcess
             // 
             checkBoxControlSingleAppProcess.AutoSize = true;
-            checkBoxControlSingleAppProcess.Location = new Point(163, 127);
+            checkBoxControlSingleAppProcess.Location = new Point(229, 136);
             checkBoxControlSingleAppProcess.Name = "checkBoxControlSingleAppProcess";
             checkBoxControlSingleAppProcess.Size = new Size(15, 14);
             checkBoxControlSingleAppProcess.TabIndex = 8;
@@ -108,7 +93,7 @@
             // processIndexSelector
             // 
             processIndexSelector.Enabled = false;
-            processIndexSelector.Location = new Point(94, 152);
+            processIndexSelector.Location = new Point(342, 133);
             processIndexSelector.Name = "processIndexSelector";
             processIndexSelector.Size = new Size(35, 23);
             processIndexSelector.TabIndex = 9;
@@ -117,7 +102,7 @@
             // labelProcessIndex
             // 
             labelProcessIndex.AutoSize = true;
-            labelProcessIndex.Location = new Point(7, 154);
+            labelProcessIndex.Location = new Point(255, 135);
             labelProcessIndex.Name = "labelProcessIndex";
             labelProcessIndex.Size = new Size(81, 15);
             labelProcessIndex.TabIndex = 10;
@@ -140,7 +125,7 @@
             comboBoxConfig.AccessibleRole = AccessibleRole.ComboBox;
             comboBoxConfig.DropDownStyle = ComboBoxStyle.DropDownList;
             comboBoxConfig.FormattingEnabled = true;
-            comboBoxConfig.Location = new Point(63, 4);
+            comboBoxConfig.Location = new Point(56, 4);
             comboBoxConfig.Name = "comboBoxConfig";
             comboBoxConfig.Size = new Size(275, 23);
             comboBoxConfig.TabIndex = 11;
@@ -148,7 +133,7 @@
             // labelHotkeys
             // 
             labelHotkeys.AutoSize = true;
-            labelHotkeys.Location = new Point(7, 95);
+            labelHotkeys.Location = new Point(7, 96);
             labelHotkeys.Name = "labelHotkeys";
             labelHotkeys.Size = new Size(50, 15);
             labelHotkeys.TabIndex = 13;
@@ -156,18 +141,19 @@
             // 
             // textboxHotkeys
             // 
-            textboxHotkeys.Location = new Point(63, 91);
+            textboxHotkeys.ImeMode = ImeMode.On;
+            textboxHotkeys.Location = new Point(56, 93);
             textboxHotkeys.Name = "textboxHotkeys";
+            textboxHotkeys.PlaceholderText = "Add hotkeys";
             textboxHotkeys.ReadOnly = true;
-            textboxHotkeys.Size = new Size(262, 23);
+            textboxHotkeys.Size = new Size(275, 23);
             textboxHotkeys.TabIndex = 14;
-            textboxHotkeys.TextAlign = HorizontalAlignment.Center;
             // 
             // buttonHotkeyAdd
             // 
-            buttonHotkeyAdd.Location = new Point(331, 91);
+            buttonHotkeyAdd.Location = new Point(337, 93);
             buttonHotkeyAdd.Name = "buttonHotkeyAdd";
-            buttonHotkeyAdd.Size = new Size(63, 23);
+            buttonHotkeyAdd.Size = new Size(65, 25);
             buttonHotkeyAdd.TabIndex = 15;
             buttonHotkeyAdd.Text = "Add";
             buttonHotkeyAdd.UseVisualStyleBackColor = true;
@@ -175,9 +161,9 @@
             // 
             // buttonHotkeyReset
             // 
-            buttonHotkeyReset.Location = new Point(400, 91);
+            buttonHotkeyReset.Location = new Point(408, 93);
             buttonHotkeyReset.Name = "buttonHotkeyReset";
-            buttonHotkeyReset.Size = new Size(63, 23);
+            buttonHotkeyReset.Size = new Size(65, 25);
             buttonHotkeyReset.TabIndex = 16;
             buttonHotkeyReset.Text = "Reset";
             buttonHotkeyReset.UseVisualStyleBackColor = true;
@@ -186,43 +172,24 @@
             // labelControlSingleAppProcess
             // 
             labelControlSingleAppProcess.AutoSize = true;
-            labelControlSingleAppProcess.Location = new Point(7, 126);
+            labelControlSingleAppProcess.Location = new Point(73, 135);
             labelControlSingleAppProcess.Name = "labelControlSingleAppProcess";
             labelControlSingleAppProcess.Size = new Size(150, 15);
             labelControlSingleAppProcess.TabIndex = 18;
             labelControlSingleAppProcess.Text = "Control Single App Process";
             // 
-            // checkBoxSetAppManual
-            // 
-            checkBoxSetAppManual.AutoSize = true;
-            checkBoxSetAppManual.Location = new Point(244, 64);
-            checkBoxSetAppManual.Name = "checkBoxSetAppManual";
-            checkBoxSetAppManual.Size = new Size(94, 19);
-            checkBoxSetAppManual.TabIndex = 19;
-            checkBoxSetAppManual.Text = "Set Manually";
-            checkBoxSetAppManual.UseVisualStyleBackColor = true;
-            checkBoxSetAppManual.CheckedChanged += checkBoxSetAppManual_CheckedChanged;
-            // 
-            // textBoxAppManual
-            // 
-            textBoxAppManual.Location = new Point(344, 62);
-            textBoxAppManual.Name = "textBoxAppManual";
-            textBoxAppManual.ReadOnly = true;
-            textBoxAppManual.Size = new Size(119, 23);
-            textBoxAppManual.TabIndex = 20;
-            // 
             // buttonSaveConfig
             // 
-            buttonSaveConfig.Location = new Point(344, 4);
+            buttonSaveConfig.Location = new Point(337, 4);
             buttonSaveConfig.Name = "buttonSaveConfig";
-            buttonSaveConfig.Size = new Size(57, 23);
+            buttonSaveConfig.Size = new Size(65, 25);
             buttonSaveConfig.TabIndex = 21;
             buttonSaveConfig.Text = "Save";
             buttonSaveConfig.UseVisualStyleBackColor = true;
             // 
             // buttonRefresh
             // 
-            buttonRefresh.Location = new Point(368, 33);
+            buttonRefresh.Location = new Point(369, 33);
             buttonRefresh.Name = "buttonRefresh";
             buttonRefresh.Size = new Size(75, 23);
             buttonRefresh.TabIndex = 22;
@@ -231,23 +198,42 @@
             // 
             // buttonDeleteConfig
             // 
-            buttonDeleteConfig.Location = new Point(407, 4);
+            buttonDeleteConfig.Location = new Point(408, 4);
             buttonDeleteConfig.Name = "buttonDeleteConfig";
-            buttonDeleteConfig.Size = new Size(57, 23);
+            buttonDeleteConfig.Size = new Size(65, 25);
             buttonDeleteConfig.TabIndex = 23;
             buttonDeleteConfig.Text = "Delete";
             buttonDeleteConfig.UseVisualStyleBackColor = true;
+            // 
+            // textBoxAppSelected
+            // 
+            textBoxAppSelected.Location = new Point(56, 62);
+            textBoxAppSelected.Name = "textBoxAppSelected";
+            textBoxAppSelected.PlaceholderText = "Select an app";
+            textBoxAppSelected.ReadOnly = true;
+            textBoxAppSelected.Size = new Size(275, 23);
+            textBoxAppSelected.TabIndex = 24;
+            textBoxAppSelected.TextChanged += textBox1_TextChanged;
+            // 
+            // buttonAppManualSet
+            // 
+            buttonAppManualSet.Location = new Point(369, 62);
+            buttonAppManualSet.Name = "buttonAppManualSet";
+            buttonAppManualSet.Size = new Size(75, 23);
+            buttonAppManualSet.TabIndex = 26;
+            buttonAppManualSet.Text = "Set";
+            buttonAppManualSet.UseVisualStyleBackColor = true;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(476, 194);
+            ClientSize = new Size(482, 169);
+            Controls.Add(buttonAppManualSet);
+            Controls.Add(textBoxAppSelected);
             Controls.Add(buttonDeleteConfig);
             Controls.Add(buttonRefresh);
             Controls.Add(buttonSaveConfig);
-            Controls.Add(textBoxAppManual);
-            Controls.Add(checkBoxSetAppManual);
             Controls.Add(labelControlSingleAppProcess);
             Controls.Add(buttonHotkeyReset);
             Controls.Add(buttonHotkeyAdd);
@@ -259,11 +245,11 @@
             Controls.Add(processIndexSelector);
             Controls.Add(checkBoxControlSingleAppProcess);
             Controls.Add(appLabel);
-            Controls.Add(appComboBox);
             Controls.Add(deviceLabel);
             Controls.Add(deviceComboBox);
             Name = "Form1";
             Text = "KBMixer";
+            Load += Form1_Load;
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -273,7 +259,6 @@
 
         private ComboBox deviceComboBox;
         private Label deviceLabel;
-        private ComboBox appComboBox;
         private Label appLabel;
         private CheckBox checkBoxControlSingleAppProcess;
         private NumericUpDown processIndexSelector;
@@ -285,10 +270,10 @@
         private Button buttonHotkeyAdd;
         private Button buttonHotkeyReset;
         private Label labelControlSingleAppProcess;
-        private CheckBox checkBoxSetAppManual;
-        private TextBox textBoxAppManual;
         private Button buttonSaveConfig;
         private Button buttonRefresh;
         private Button buttonDeleteConfig;
+        private TextBox textBoxAppSelected;
+        private Button buttonAppManualSet;
     }
 }
