@@ -1,4 +1,5 @@
 using Linearstar.Windows.RawInput;
+using NAudio.CoreAudioApi;
 using System.Diagnostics;
 
 namespace KBMixer
@@ -12,6 +13,8 @@ namespace KBMixer
         public const string down = "Down";
         public const string mouseWheelButton = "MouseWheel";
 
+        public AudioDevice[] audioDevices; // Array of Audio Devices to Control
+        public AudioApp[] audioApps; // Array of Audio Apps to Control
         public Config currentConfig; // Current Configuration of the Application
         public int[] hotkeyVirtualKeys = Array.Empty<int>(); // Array of Hotkeys to Listen For
         public bool hotkeyHeld = false;
@@ -29,6 +32,31 @@ namespace KBMixer
                 AppFileName = "defaultAppFileName",
                 Hotkeys = Array.Empty<int>()
             }; // Create an instance of the Config class
+
+            audioDevices = Audio.GetAudioDevices(); // Get all audio devices
+
+            foreach (var device in audioDevices)
+            {
+                deviceComboBox.Items.Add(device.MMDevice.FriendlyName); // Add each device to the combo box
+                audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
+            }
+
+            deviceComboBox.SelectedIndex = 0; // Select the first device in the combo box
+
+            // Loop through and debug print all fields of all AudioApps to console
+            foreach (var app in audioApps)
+            {
+                Debug.WriteLine($"DeviceId: {app.DeviceId}");
+                Debug.WriteLine($"AppFriendlyName: {app.AppFriendlyName}");
+                Debug.WriteLine($"AppFileName: {app.AppFileName}");
+                Debug.WriteLine("Sessions:");
+                foreach (var session in app.Sessions)
+                {
+                    Debug.WriteLine($"  Session Identifier: {session.GetSessionInstanceIdentifier}");
+                    Debug.WriteLine($"  Session State: {session.State}");
+                    Debug.WriteLine($"  Session Volume: {session.SimpleAudioVolume.Volume}");
+                }
+            }
         }
 
         public void RegisterRawInputDevices()
