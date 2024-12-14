@@ -15,48 +15,55 @@ namespace KBMixer
 
         public AudioDevice[] audioDevices; // Array of Audio Devices to Control
         public AudioApp[] audioApps; // Array of Audio Apps to Control
+        public Config[] configs; // Array of Configurations to Load
         public Config currentConfig; // Current Configuration of the Application
         public int[] hotkeyVirtualKeys = Array.Empty<int>(); // Array of Hotkeys to Listen For
         public bool hotkeyHeld = false;
-        public bool listeningForHotkeySet = false;
+        public bool listeningForHotkeyAdd = false;
 
         public Form1()
         {
             InitializeComponent();
             RegisterRawInputDevices();
 
-            // For Testing Purposes
-            currentConfig = new Config
+            // Load all Audio Devices and Audio Apps into Memory
+            audioDevices = Audio.GetAudioDevices();
+
+            foreach (var device in audioDevices)
             {
-                DeviceId = "defaultDeviceId",
-                AppFileName = "defaultAppFileName",
-                Hotkeys = Array.Empty<int>()
-            }; // Create an instance of the Config class
+                audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
+            }
+
+            // Get Configs from Disk, if exists
+            configs = Configurations.LoadConfigsFromDisk();
+
+            // If there are no configs from disk, create a default config
+            if (configs.Length == 0)
+            {
+                Config defaultConfig = new Config
+                {
+                    DeviceId = audioDevices[0].MMDevice.ID,
+                    AppFileName = audioDevices[0].AudioApps[0].AppFileName,
+                    Hotkeys = Array.Empty<int>(),
+                    ControlSingleSession = false,
+                    ProcessIndex = 0
+                };
+                configs = new Config[] { defaultConfig };
+            }
+
+            // Populate Configs into GUI
+            PopulateConfigs();
 
             audioDevices = Audio.GetAudioDevices(); // Get all audio devices
 
             foreach (var device in audioDevices)
             {
-                deviceComboBox.Items.Add(device.MMDevice.FriendlyName); // Add each device to the combo box
                 audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
             }
 
-            deviceComboBox.SelectedIndex = 0; // Select the first device in the combo box
 
-            // Loop through and debug print all fields of all AudioApps to console
-            foreach (var app in audioApps)
-            {
-                Debug.WriteLine($"DeviceId: {app.DeviceId}");
-                Debug.WriteLine($"AppFriendlyName: {app.AppFriendlyName}");
-                Debug.WriteLine($"AppFileName: {app.AppFileName}");
-                Debug.WriteLine("Sessions:");
-                foreach (var session in app.Sessions)
-                {
-                    Debug.WriteLine($"  Session Identifier: {session.GetSessionInstanceIdentifier}");
-                    Debug.WriteLine($"  Session State: {session.State}");
-                    Debug.WriteLine($"  Session Volume: {session.SimpleAudioVolume.Volume}");
-                }
-            }
+            PopulateAudioDevices();
+            PopulateAudioApps();
         }
 
         public void RegisterRawInputDevices()
@@ -81,12 +88,9 @@ namespace KBMixer
                     bool keyUp = keyboardData.Keyboard.Flags.ToString() == up; // gotta be a better way to do this
 
                     // if we're looking to set the hot key, not adjust volume
-                    if (listeningForHotkeySet)
+                    if (listeningForHotkeyAdd)
                     {
-                        listeningForHotkeySet = false; // prevent double-triggering conditional code block by immediately stop listening
-                        btnHotkey.Enabled = true; // re-enable the button to allow the hotkey to be changed
-                        btnHotkey.Text = ((Keys)virtualKey).ToString(); // represent button press with friendly key name
-                        hotkeyVirtualKeys = hotkeyVirtualKeys.Append(virtualKey).ToArray(); // set the hotkey to be used for volume control
+                        AddHotkey(virtualKey);
                     }
 
                     // If the key was pressed down (Flags = None) and the key is in the array of hotkeys
@@ -117,6 +121,70 @@ namespace KBMixer
             base.WndProc(ref m); // Continue processing the message as WndProc normally would
         }
 
+        // Specifically only for populating Configs into ComboBox
+        // NOT getting the config objects themselves
+        private void PopulateConfigs()
+        {
+            // Clear the combo box
+            comboBoxConfig.Items.Clear();
+            // Loop through all configs
+            foreach (var config in configs)
+            {
+                // Add each config to the combo box
+                comboBoxConfig.Items.Add(config.AppFileName);
+            }
+            // Select the first config in the combo box
+            comboBoxConfig.SelectedIndex = 0;
+            currentConfig = configs[0];
+        }
+
+        private void PopulateAudioDevices()
+        {
+            // Clear the combo box
+            deviceComboBox.Items.Clear();
+            int selectedIndex = 0;
+
+            // Loop through all audio devices
+            for (int i = 0; i < audioDevices.Length; i++)
+            {
+                var device = audioDevices[i];
+                // Add each device to the combo box as a selectable option
+                deviceComboBox.Items.Add(device.MMDevice.FriendlyName);
+
+                // If the current config's Device selection is currently available
+                if (device.MMDevice.ID == currentConfig.DeviceId)
+                {
+                    selectedIndex = i; // select it
+                }
+            }
+
+            // Set the selected index to the matched device or default to 0
+            deviceComboBox.SelectedIndex = selectedIndex;
+        }
+
+        private void PopulateAudioApps()
+        {
+            // Update this so it only populates audio apps pertaining to the selected device / current config
+            // Clear the combo box
+            appComboBox.Items.Clear();
+            // Loop through all audio apps
+            foreach (var app in audioApps)
+            {
+                // Add each app to the combo box
+                appComboBox.Items.Add(app.AppFriendlyName);
+            }
+
+            // Add the app from the current config to the combo box
+            appComboBox.SelectedIndex = 0;
+        }
+
+        private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            currentConfig = configs[comboBoxConfig.SelectedIndex]; // Update the current config object
+            PopulateAudioDevices();
+            PopulateAudioApps();
+        }
+
         private void deviceComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             //MMDeviceEnumerator enumerator = new MMDeviceEnumerator();
@@ -131,17 +199,46 @@ namespace KBMixer
             //selectedSessionInstanceIdentifier = kbMixerSessions[appComboBox.SelectedIndex].Sessions[0].GetSessionInstanceIdentifier; // Update the selected session object
         }
 
-        private void btnHotkey_Click(object sender, EventArgs e)
+        private void buttonHotkeyAdd_Click(object sender, EventArgs e)
         {
-            // Update the button text to say "Press a key..."  
-            btnHotkey.Text = "Press a key...";
+            // Update the button text to indicate to user to press a hotkey to set
+            buttonHotkeyAdd.Text = "Listening...";
 
             // Disable the button so the function can't be called again until the hotkey is set  
-            btnHotkey.Enabled = false;
+            buttonHotkeyAdd.Enabled = false;
 
             // Set a flag/variable to indicate that we are waiting for a key press
             // so that WndProc knows to process the key press
-            listeningForHotkeySet = true;
+            listeningForHotkeyAdd = true;
+        }
+
+        private void buttonHotkeyReset_Click(object sender, EventArgs e)
+        {
+            // Clear the hotkey array
+            hotkeyVirtualKeys = Array.Empty<int>();
+            // Clear the textbox
+            textboxHotkeys.Text = "";
+        }
+
+        private void AddHotkey(int virtualKey)
+        {
+            listeningForHotkeyAdd = false; // prevent double-triggering conditional code block by immediately stop listening
+            buttonHotkeyAdd.Enabled = true; // re-enable the button to allow a new hotkey to be added
+            buttonHotkeyAdd.Text = "Add"; // Reset the button text, maybe make this a constant
+
+            // Check if the hotkey already exists in the array
+            if (!hotkeyVirtualKeys.Contains(virtualKey))
+            {
+                // Add the hotkey to the array
+                hotkeyVirtualKeys = hotkeyVirtualKeys.Append(virtualKey).ToArray();
+
+                // Update the textbox text with the array of hotkeys as a string, in "HK1 + HK2 + HK3" format
+                textboxHotkeys.Text = string.Join(" + ", hotkeyVirtualKeys.Select(key => ((Keys)key).ToString()));
+            }
+            else
+            {
+                MessageBox.Show("This hotkey is already added.", "Duplicate Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
@@ -164,6 +261,36 @@ namespace KBMixer
             Debug.WriteLine($"Hotkeys: {currentConfig.Hotkeys}");
             Debug.WriteLine($"ControlSingleSession: {currentConfig.ControlSingleSession}");
             Debug.WriteLine($"ProcessIndex: {currentConfig.ProcessIndex}");
+        }
+
+        private void buttonAddManualApp_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void labelConfig_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void processIndexSelector_ValueChanged(object sender, EventArgs e)
+        {
+            currentConfig.ProcessIndex = (int)processIndexSelector.Value;
+        }
+
+        private void buttonSaveConfig_Click(object sender, EventArgs e)
+        {
+            currentConfig.SaveConfig();
+        }
+        private void checkBoxSetAppManual_CheckedChanged(object sender, EventArgs e)
+        {
+            textBoxAppManual.ReadOnly = !checkBoxSetAppManual.Checked;
+            appComboBox.Enabled = !checkBoxSetAppManual.Checked;
         }
     }
 }
