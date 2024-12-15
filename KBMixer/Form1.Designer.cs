@@ -41,8 +41,8 @@
             buttonHotkeyAdd = new Button();
             buttonHotkeyReset = new Button();
             labelControlSingleAppProcess = new Label();
-            buttonSaveConfig = new Button();
-            buttonRefresh = new Button();
+            buttonNewConfig = new Button();
+            buttonRefreshAudio = new Button();
             buttonDeleteConfig = new Button();
             textBoxAppSelected = new TextBox();
             buttonAppManualSet = new Button();
@@ -98,6 +98,7 @@
             processIndexSelector.Size = new Size(35, 23);
             processIndexSelector.TabIndex = 9;
             processIndexSelector.TextAlign = HorizontalAlignment.Center;
+            processIndexSelector.ValueChanged += processIndexSelector_ValueChanged;
             // 
             // labelProcessIndex
             // 
@@ -129,6 +130,7 @@
             comboBoxConfig.Name = "comboBoxConfig";
             comboBoxConfig.Size = new Size(275, 23);
             comboBoxConfig.TabIndex = 11;
+            comboBoxConfig.SelectedIndexChanged += comboBoxConfig_SelectedIndexChanged;
             // 
             // labelHotkeys
             // 
@@ -178,23 +180,24 @@
             labelControlSingleAppProcess.TabIndex = 18;
             labelControlSingleAppProcess.Text = "Control Single App Process";
             // 
-            // buttonSaveConfig
+            // buttonNewConfig
             // 
-            buttonSaveConfig.Location = new Point(337, 4);
-            buttonSaveConfig.Name = "buttonSaveConfig";
-            buttonSaveConfig.Size = new Size(65, 25);
-            buttonSaveConfig.TabIndex = 21;
-            buttonSaveConfig.Text = "Save";
-            buttonSaveConfig.UseVisualStyleBackColor = true;
+            buttonNewConfig.Location = new Point(337, 4);
+            buttonNewConfig.Name = "buttonNewConfig";
+            buttonNewConfig.Size = new Size(65, 25);
+            buttonNewConfig.TabIndex = 21;
+            buttonNewConfig.Text = "New";
+            buttonNewConfig.UseVisualStyleBackColor = true;
+            buttonNewConfig.Click += buttonNewConfig_Click;
             // 
-            // buttonRefresh
+            // buttonRefreshAudio
             // 
-            buttonRefresh.Location = new Point(369, 33);
-            buttonRefresh.Name = "buttonRefresh";
-            buttonRefresh.Size = new Size(75, 23);
-            buttonRefresh.TabIndex = 22;
-            buttonRefresh.Text = "Refresh";
-            buttonRefresh.UseVisualStyleBackColor = true;
+            buttonRefreshAudio.Location = new Point(369, 33);
+            buttonRefreshAudio.Name = "buttonRefreshAudio";
+            buttonRefreshAudio.Size = new Size(75, 23);
+            buttonRefreshAudio.TabIndex = 22;
+            buttonRefreshAudio.Text = "Refresh";
+            buttonRefreshAudio.UseVisualStyleBackColor = true;
             // 
             // buttonDeleteConfig
             // 
@@ -204,6 +207,7 @@
             buttonDeleteConfig.TabIndex = 23;
             buttonDeleteConfig.Text = "Delete";
             buttonDeleteConfig.UseVisualStyleBackColor = true;
+            buttonDeleteConfig.Click += buttonDeleteConfig_Click;
             // 
             // textBoxAppSelected
             // 
@@ -232,8 +236,8 @@
             Controls.Add(buttonAppManualSet);
             Controls.Add(textBoxAppSelected);
             Controls.Add(buttonDeleteConfig);
-            Controls.Add(buttonRefresh);
-            Controls.Add(buttonSaveConfig);
+            Controls.Add(buttonRefreshAudio);
+            Controls.Add(buttonNewConfig);
             Controls.Add(labelControlSingleAppProcess);
             Controls.Add(buttonHotkeyReset);
             Controls.Add(buttonHotkeyAdd);
@@ -270,8 +274,8 @@
         private Button buttonHotkeyAdd;
         private Button buttonHotkeyReset;
         private Label labelControlSingleAppProcess;
-        private Button buttonSaveConfig;
-        private Button buttonRefresh;
+        private Button buttonNewConfig;
+        private Button buttonRefreshAudio;
         private Button buttonDeleteConfig;
         private TextBox textBoxAppSelected;
         private Button buttonAppManualSet;

@@ -26,9 +26,10 @@ namespace KBMixer
             InitializeComponent();
             RegisterRawInputDevices();
 
-            // Load all Audio Devices and Audio Apps into Memory
+            // Load all Audio Devices into Memory
             audioDevices = Audio.GetAudioDevices();
 
+            // Load all Audio Apps into Memory
             foreach (var device in audioDevices)
             {
                 audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
@@ -40,35 +41,22 @@ namespace KBMixer
             // If there are no configs from disk, create a default config
             if (configs.Length == 0)
             {
-                Config defaultConfig = new Config
-                {
-                    DeviceId = audioDevices[0].MMDevice.ID,
-                    AppFileName = audioDevices[0].AudioApps[0].AppFileName,
-                    Hotkeys = Array.Empty<int>(),
-                    ControlSingleSession = false,
-                    ProcessIndex = 0
-                };
-                configs = new Config[] { defaultConfig };
+                buttonNewConfig_Click(null, null);
             }
 
             currentConfig = configs[0]; // Set the current config to the first config
 
-            // TEST: Save Config to Disk
-            configs[0].SaveConfig();
-
             // Populate Configs into GUI
             PopulateConfigs();
+        }
 
-            audioDevices = Audio.GetAudioDevices(); // Get all audio devices
-
-            foreach (var device in audioDevices)
-            {
-                audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
-            }
-
-
+        public void LoadConfigToForm()
+        {
+            // Load the current config into the form
             PopulateAudioDevices();
-            
+            PopulateAudioAppSelection();
+            PopulateHotkeys();
+            PopulateProcessControls();
         }
 
         public void RegisterRawInputDevices()
@@ -136,7 +124,7 @@ namespace KBMixer
             foreach (var config in configs)
             {
                 // Add each config to the combo box
-                comboBoxConfig.Items.Add(config.AppFileName);
+                comboBoxConfig.Items.Add(config.ConfigId);
             }
             // Select the first config in the combo box
             comboBoxConfig.SelectedIndex = 0;
@@ -161,26 +149,43 @@ namespace KBMixer
                 {
                     selectedIndex = i; // select it
                 }
+                else
+                {
+                    MessageBox.Show("Audio device from configuration is not available. Please set a desired Audio Output Device.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
 
             // Set the selected index to the matched device or default to 0
             deviceComboBox.SelectedIndex = selectedIndex;
         }
 
+        private void PopulateAudioAppSelection()
+        {
+            textBoxAppSelected.Text = currentConfig.AppFileName;
+        }
 
+        private void PopulateHotkeys()
+        {
+            textboxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(key => ((Keys)key).ToString()));
+        }
+
+        private void PopulateProcessControls()
+        {
+            checkBoxControlSingleAppProcess.Checked = currentConfig.ControlSingleSession;
+            processIndexSelector.Value = currentConfig.ProcessIndex;
+        }
 
         private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
         {
             currentConfig = configs[comboBoxConfig.SelectedIndex]; // Update the current config object
-            PopulateAudioDevices();
+            LoadConfigToForm();
         }
 
         private void deviceComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            //MMDeviceEnumerator enumerator = new MMDeviceEnumerator();
-            //MMDeviceCollection devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-            //selectedDevice = devices[deviceComboBox.SelectedIndex]; // Update the selected device object
-            //PopulateAudioOutputSessions();
+            // Update current config with the selected device
+            currentConfig.DeviceId = audioDevices[deviceComboBox.SelectedIndex].MMDevice.ID;
+            currentConfig.SaveConfig();
         }
 
         private void appComboBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -229,6 +234,8 @@ namespace KBMixer
             {
                 MessageBox.Show("This hotkey is already added.", "Duplicate Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+
+            currentConfig.Hotkeys = hotkeyVirtualKeys;
         }
 
         private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
@@ -237,22 +244,14 @@ namespace KBMixer
             if (currentConfig.ControlSingleSession)
             {
                 processIndexSelector.Enabled = true;
-                currentConfig.ProcessIndex = (int)processIndexSelector.Value;
             }
             else
             {
                 processIndexSelector.Enabled = false;
             }
-
-            // Write all properties of the Config class to debug output
-            Debug.WriteLine($"ConfigId: {currentConfig.ConfigId}");
-            Debug.WriteLine($"DeviceId: {currentConfig.DeviceId}");
-            Debug.WriteLine($"AppFileName: {currentConfig.AppFileName}");
-            Debug.WriteLine($"Hotkeys: {currentConfig.Hotkeys}");
-            Debug.WriteLine($"ControlSingleSession: {currentConfig.ControlSingleSession}");
-            Debug.WriteLine($"ProcessIndex: {currentConfig.ProcessIndex}");
+            Debug.WriteLine("Current Config's ControlSingleSession: " + currentConfig.ControlSingleSession);
+            currentConfig.SaveConfig();
         }
-
         private void buttonAddManualApp_Click(object sender, EventArgs e)
         {
 
@@ -271,6 +270,7 @@ namespace KBMixer
         private void processIndexSelector_ValueChanged(object sender, EventArgs e)
         {
             currentConfig.ProcessIndex = (int)processIndexSelector.Value;
+            currentConfig.SaveConfig();
         }
 
         private void buttonSaveConfig_Click(object sender, EventArgs e)
@@ -286,6 +286,71 @@ namespace KBMixer
         private void Form1_Load(object sender, EventArgs e)
         {
 
+        }
+        private void buttonNewConfig_Click(object sender, EventArgs e)
+        {
+            // Create a new config with default values
+            Config newConfig = new Config
+            {
+                ConfigId = Guid.NewGuid(),
+                DeviceId = audioDevices[0].MMDevice.ID,
+                AppFileName = audioDevices[0].AudioApps[0].AppFileName,
+                Hotkeys = Array.Empty<int>(),
+                ControlSingleSession = false,
+                ProcessIndex = 0
+            };
+
+            // Add the new config to the configs array
+            configs = configs.Append(newConfig).ToArray();
+
+            // Save the new config to disk
+            newConfig.SaveConfig();
+
+            // Update the current config to the new config
+            currentConfig = newConfig;
+
+            // Repopulate the configs in the GUI
+            PopulateConfigs();
+
+            // Select the new config in the combo box
+            comboBoxConfig.SelectedIndex = configs.Length - 1;
+        }
+
+        private void buttonDeleteConfig_Click(object sender, EventArgs e)
+        {
+            // If there is only one config left, show a warning message and return
+            if (configs.Length == 1)
+            {
+                MessageBox.Show("Cannot delete the only remaining configuration.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Get the index of the selected config
+            int selectedIndex = comboBoxConfig.SelectedIndex;
+            // Get the config object from the configs array
+            Config configToDelete = configs[selectedIndex];
+            // Remove the config from the configs array
+            configs = configs.Where((source, index) => index != selectedIndex).ToArray();
+            // Delete the config from disk
+            configToDelete.DeleteConfig();
+            // Repopulate the configs in the GUI
+            PopulateConfigs();
+            // Select the first config in the combo box
+            comboBoxConfig.SelectedIndex = 0;
+        }
+        private void buttonRefreshAudio_Click(object sender, EventArgs e)
+        {
+            // Load all Audio Devices into Memory
+            audioDevices = Audio.GetAudioDevices();
+
+            // Load all Audio Apps into Memory
+            foreach (var device in audioDevices)
+            {
+                audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
+            }
+
+            // Repopulate the audio devices in the GUI
+            PopulateAudioDevices();
         }
     }
 }
