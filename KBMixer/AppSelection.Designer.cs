@@ -44,7 +44,7 @@
             radioSelect.TabStop = true;
             radioSelect.Text = "Select from List of Active Apps";
             radioSelect.UseVisualStyleBackColor = true;
-            radioSelect.CheckedChanged += new EventHandler(radioSelect_CheckedChanged);
+            radioSelect.CheckedChanged += radioSelect_CheckedChanged;
             // 
             // radioEnter
             // 
@@ -56,7 +56,7 @@
             radioEnter.TabStop = true;
             radioEnter.Text = "Enter App Name Manually";
             radioEnter.UseVisualStyleBackColor = true;
-            radioEnter.CheckedChanged += new EventHandler(radioEnter_CheckedChanged);
+            radioEnter.CheckedChanged += radioEnter_CheckedChanged;
             // 
             // comboBoxSelect
             // 
@@ -96,7 +96,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(417, 134);
+            ClientSize = new Size(423, 134);
             Controls.Add(buttonCancel);
             Controls.Add(buttonOk);
             Controls.Add(textBoxEnter);

@@ -35,6 +35,11 @@ namespace KBMixer
                 audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
             }
 
+            foreach (var app in audioApps)
+            {
+                Debug.WriteLine("AUDIO APP SESSION ID: " + app.Sessions[0].GetSessionInstanceIdentifier);
+            }
+
             // Get Configs from Disk, if exists
             configs = Configurations.LoadConfigsFromDisk();
 

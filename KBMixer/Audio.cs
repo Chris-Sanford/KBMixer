@@ -34,7 +34,7 @@ namespace KBMixer
     // these are methods that are used to build AudioApp objects
     public static class Audio 
     {
-        public const string systemSoundsId = "{6C26BA7D-F0B2-4225-B422-8168C5261E45}";
+        public const string systemSoundsId = "|1%b#";
 
         //private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
         //private string selectedAppName; // To control per-app
@@ -78,7 +78,7 @@ namespace KBMixer
                 // or at the very least, remove the file extension
                 string appFriendlyName = appName;
 
-                if (appName.Contains(systemSoundsId))
+                if (sessionInstanceIdentifier.Contains(systemSoundsId))
                 {
                     appName = systemSoundsId;
                     appFriendlyName = "System Sounds";
