@@ -12,36 +12,51 @@ namespace KBMixer
 {
     public partial class AppSelection : Form
     {
-        public AppSelection()
+        // Default to selecting an active app, false means get value for manual entry
+        private bool isSelect = true;
+        private string? SelectedAppFileName;
+        public AppSelection(AudioApp[] audioApps)
         {
             InitializeComponent();
+            AppSelection_Load(audioApps);
         }
 
-        //private void PopulateAudioApps()
-        //{
-        //    // Update this so it only populates audio apps pertaining to the selected device / current config
-        //    // Clear the combo box
-        //    appComboBox.Items.Clear();
-        //    // Loop through all audio apps
-        //    foreach (var app in audioApps)
-        //    {
-        //        // Add each app to the combo box
-        //        appComboBox.Items.Add(app.AppFriendlyName);
-        //    }
-
-        //    // Add the app from the current config to the combo box
-        //    appComboBox.SelectedIndex = 0;
-        //}
-
-        //private void checkBoxSetAppManual_CheckedChanged(object sender, EventArgs e)
-        //{
-        //    textBoxAppManual.ReadOnly = !checkBoxSetAppManual.Checked;
-        //    appComboBox.Enabled = !checkBoxSetAppManual.Checked;
-        //}
-
-        private void labelAppSelect_Click(object sender, EventArgs e)
+        // Disable ComboBox when Manual Radio Button is Selected
+        private void radioEnter_CheckedChanged(object sender, EventArgs e)
         {
-
+            if (radioEnter.Checked)
+            {
+                comboBoxSelect.Enabled = false;
+                textBoxEnter.Enabled = true;
+                textBoxEnter.ReadOnly = false;
+                isSelect = false;
+            }
         }
+
+        // Make TextBox Read Only when Drop-Down Radio Button is Selected
+        private void radioSelect_CheckedChanged(object sender, EventArgs e)
+        {
+            if (radioSelect.Checked)
+            {
+                comboBoxSelect.Enabled = true;
+                textBoxEnter.Enabled = false;
+                textBoxEnter.ReadOnly = true;
+                isSelect = true;
+            }
+        }
+
+        // Populate Active Apps in ComboBox
+        private void AppSelection_Load(AudioApp[] audioApps)
+        {
+            comboBoxSelect.Items.Clear();
+            foreach (var app in audioApps)
+            {
+                comboBoxSelect.Items.Add(app.AppFriendlyName);
+            }
+        }
+
+        // Clicking OK Button should Update Config and Save Configuration to Disk
+
+        // Clicking Cancel Button should Close the Form without updating Config
     }
 }

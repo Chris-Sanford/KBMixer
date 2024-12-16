@@ -45,7 +45,7 @@
             buttonRefreshAudio = new Button();
             buttonDeleteConfig = new Button();
             textBoxAppSelected = new TextBox();
-            buttonAppManualSet = new Button();
+            buttonAppSet = new Button();
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).BeginInit();
             SuspendLayout();
             // 
@@ -217,23 +217,24 @@
             textBoxAppSelected.ReadOnly = true;
             textBoxAppSelected.Size = new Size(275, 23);
             textBoxAppSelected.TabIndex = 24;
-            textBoxAppSelected.TextChanged += textBox1_TextChanged;
+            textBoxAppSelected.TextChanged += textBoxEnter_TextChanged;
             // 
-            // buttonAppManualSet
+            // buttonAppSet
             // 
-            buttonAppManualSet.Location = new Point(369, 62);
-            buttonAppManualSet.Name = "buttonAppManualSet";
-            buttonAppManualSet.Size = new Size(75, 23);
-            buttonAppManualSet.TabIndex = 26;
-            buttonAppManualSet.Text = "Set";
-            buttonAppManualSet.UseVisualStyleBackColor = true;
+            buttonAppSet.Location = new Point(369, 62);
+            buttonAppSet.Name = "buttonAppSet";
+            buttonAppSet.Size = new Size(75, 23);
+            buttonAppSet.TabIndex = 26;
+            buttonAppSet.Text = "Set";
+            buttonAppSet.UseVisualStyleBackColor = true;
+            buttonAppSet.Click += buttonAppSet_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(482, 169);
-            Controls.Add(buttonAppManualSet);
+            Controls.Add(buttonAppSet);
             Controls.Add(textBoxAppSelected);
             Controls.Add(buttonDeleteConfig);
             Controls.Add(buttonRefreshAudio);
@@ -278,6 +279,6 @@
         private Button buttonRefreshAudio;
         private Button buttonDeleteConfig;
         private TextBox textBoxAppSelected;
-        private Button buttonAppManualSet;
+        private Button buttonAppSet;
     }
 }

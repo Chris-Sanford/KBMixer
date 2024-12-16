@@ -278,7 +278,7 @@ namespace KBMixer
             currentConfig.SaveConfig();
         }
 
-        private void textBox1_TextChanged(object sender, EventArgs e)
+        private void textBoxEnter_TextChanged(object sender, EventArgs e)
         {
 
         }
@@ -351,6 +351,25 @@ namespace KBMixer
 
             // Repopulate the audio devices in the GUI
             PopulateAudioDevices();
+        }
+        private void OpenAppSelectionForm(AudioApp[] audioApps)
+        {
+            using (var appSelectionForm = new AppSelection(audioApps))
+            {
+                if (appSelectionForm.ShowDialog() == DialogResult.OK)
+                {
+                    // Handle the selected app from the AppSelectionForm
+                    //var selectedApp = appSelectionForm.SelectedApp;
+                    //currentConfig.AppFileName = selectedApp.AppFileName;
+                    //textBoxAppSelected.Text = selectedApp.AppFileName;
+                    //currentConfig.SaveConfig();
+                }
+            }
+        }
+
+        private void buttonAppSet_Click(object sender, EventArgs e)
+        {
+            OpenAppSelectionForm(audioApps);
         }
     }
 }
