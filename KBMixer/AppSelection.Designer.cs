@@ -82,6 +82,7 @@
             buttonOk.TabIndex = 4;
             buttonOk.Text = "OK";
             buttonOk.UseVisualStyleBackColor = true;
+            buttonOk.Click += buttonOk_Click;
             // 
             // buttonCancel
             // 
@@ -91,6 +92,7 @@
             buttonCancel.TabIndex = 5;
             buttonCancel.Text = "Cancel";
             buttonCancel.UseVisualStyleBackColor = true;
+            buttonCancel.Click += buttonCancel_Click;
             // 
             // AppSelection
             // 

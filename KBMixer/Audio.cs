@@ -34,7 +34,7 @@ namespace KBMixer
     // these are methods that are used to build AudioApp objects
     public static class Audio 
     {
-        public const string systemSoundsId = "|1%b#";
+        public const string systemSoundsId = "%b#";
 
         //private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
         //private string selectedAppName; // To control per-app
