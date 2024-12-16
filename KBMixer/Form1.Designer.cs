@@ -46,6 +46,7 @@
             buttonDeleteConfig = new Button();
             textBoxAppSelected = new TextBox();
             buttonAppSet = new Button();
+            labelInstructions = new Label();
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).BeginInit();
             SuspendLayout();
             // 
@@ -229,11 +230,22 @@
             buttonAppSet.UseVisualStyleBackColor = true;
             buttonAppSet.Click += buttonAppSet_Click;
             // 
+            // labelInstructions
+            // 
+            labelInstructions.AutoSize = true;
+            labelInstructions.Location = new Point(56, 171);
+            labelInstructions.Name = "labelInstructions";
+            labelInstructions.Size = new Size(366, 45);
+            labelInstructions.TabIndex = 27;
+            labelInstructions.Text = "Once you've configured KBMixer as desired,\nhold the required hotkeys and scroll up or down with your mouse to\nadjust the volume of the selected app from anywhere.";
+            labelInstructions.TextAlign = ContentAlignment.MiddleCenter;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(482, 169);
+            ClientSize = new Size(482, 225);
+            Controls.Add(labelInstructions);
             Controls.Add(buttonAppSet);
             Controls.Add(textBoxAppSelected);
             Controls.Add(buttonDeleteConfig);
@@ -280,5 +292,6 @@
         private Button buttonDeleteConfig;
         private TextBox textBoxAppSelected;
         private Button buttonAppSet;
+        private Label labelInstructions;
     }
 }

@@ -218,6 +218,10 @@ namespace KBMixer
             hotkeyVirtualKeys = Array.Empty<int>();
             // Clear the textbox
             textboxHotkeys.Text = "";
+            // Update Config Object
+            currentConfig.Hotkeys = hotkeyVirtualKeys;
+            // Save config to disk
+            currentConfig.SaveConfig();
         }
 
         private void AddHotkey(int virtualKey)
@@ -241,6 +245,9 @@ namespace KBMixer
             }
 
             currentConfig.Hotkeys = hotkeyVirtualKeys;
+
+            // Save Config to Disk
+            currentConfig.SaveConfig();
         }
 
         private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
@@ -299,7 +306,7 @@ namespace KBMixer
             {
                 ConfigId = Guid.NewGuid(),
                 DeviceId = audioDevices[0].MMDevice.ID,
-                AppFileName = audioDevices[0].AudioApps[0].AppFileName,
+                AppFileName = "System Sounds",
                 Hotkeys = Array.Empty<int>(),
                 ControlSingleSession = false,
                 ProcessIndex = 0
