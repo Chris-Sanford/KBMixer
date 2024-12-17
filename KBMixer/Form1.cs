@@ -17,8 +17,8 @@ namespace KBMixer
         public AudioApp[] audioApps; // Array of Audio Apps to Control
         public Config[] configs; // Array of Configurations to Load
         public Config currentConfig; // Current Configuration of the Application
-        public int[] hotkeyVirtualKeys = Array.Empty<int>(); // Array of Hotkeys to Listen For
-        public bool hotkeyHeld = false;
+        public int[] hotkeysToListenFor = Array.Empty<int>(); // Array of Hotkeys to Listen For
+        public int[] hotkeysHeld = Array.Empty<int>(); // Array of Hotkeys that are currently being held down
         public bool listeningForHotkeyAdd = false;
 
         public Form1()
@@ -53,6 +53,9 @@ namespace KBMixer
 
             // Populate Configs into GUI
             PopulateConfigs();
+
+            // Update the array of hotkeys to listen for from all available configs
+            UpdateHotkeysToListenFor();
         }
 
         public void LoadConfigToForm()
@@ -68,6 +71,28 @@ namespace KBMixer
         {
             RawInputDevice.RegisterDevice(HidUsageAndPage.Keyboard, RawInputDeviceFlags.InputSink, Handle);
             RawInputDevice.RegisterDevice(HidUsageAndPage.Mouse, RawInputDeviceFlags.InputSink, Handle);
+        }
+
+        // Load Hotkeys from Configurations
+        public void UpdateHotkeysToListenFor()
+        {
+            hotkeysToListenFor = configs.SelectMany(config => config.Hotkeys).Distinct().ToArray();
+        }
+
+        // Create a method that will add or remove a hotkey from the array of hotkeys
+        // based on the key pressed or released
+        public void UpdateHotkeysHeld(int virtualKey, bool keyUp)
+        {
+            // If the key was pressed down (Flags = None) and the key is in the array of hotkeys
+            if (hotkeysToListenFor.Contains(virtualKey) && keyUp == false && !hotkeysHeld.Contains(virtualKey))
+            {
+                hotkeysHeld = hotkeysHeld.Append(virtualKey).ToArray();
+            }
+            else if (keyUp) // If the key was released (Flags = Up)
+            {
+                hotkeysHeld = hotkeysHeld.Where(key => key != virtualKey).ToArray();
+            }
+            Debug.WriteLine("Hotkeys Held: " + string.Join(", ", hotkeysHeld.Select(key => ((Keys)key).ToString())));
         }
 
         // override the original WndProc method to process raw input messages
@@ -90,15 +115,10 @@ namespace KBMixer
                     {
                         AddHotkey(virtualKey);
                     }
-
-                    // If the key was pressed down (Flags = None) and the key is in the array of hotkeys
-                    if (hotkeyVirtualKeys.Contains(virtualKey) && keyUp == false)
+                    else
                     {
-                        hotkeyHeld = true;
-                    }
-                    else // If the key was released (Flags = Up)
-                    {
-                        hotkeyHeld = false;
+                        // Update the array of hotkeys that are currently being held down
+                        UpdateHotkeysHeld(virtualKey, keyUp);
                     }
                 }
                 else if (data is RawInputMouseData mouseData)
@@ -109,10 +129,29 @@ namespace KBMixer
                     // If the mouse input was a scroll up or down
                     if (isMouseWheel && wasUpOrDown)
                     {
-                        // WORK IN PROGRESS wip WIP
-                        // Identify the audio app associated to the held hotkey(s)
+                        // Identify the configurations that match the hotkeys held
+                        var matchingConfigs = configs
+                            .Where(config => config.Hotkeys.SequenceEqual(hotkeysHeld))
+                            .ToArray();
 
-                        // Adjust the volume of the audio app (or the specified session) based on scroll direction
+                        // Create the array of AudioApps that match the app file names
+                        var matchingAudioApps = audioApps
+                            .Where(app => matchingConfigs.Any(config => config.AppFileName == app.AppFileName))
+                            .ToArray();
+
+                        // Adjust the volume of the audio apps (or the specified session) based on scroll direction
+                        foreach (var app in matchingAudioApps)
+                        {
+                            var config = matchingConfigs.FirstOrDefault(c => c.AppFileName == app.AppFileName);
+                            if (config != null && config.ControlSingleSession)
+                            {
+                                app.AdjustVolume(mouseData.Mouse.ButtonData == mouseWheelUp, config.ProcessIndex);
+                            }
+                            else
+                            {
+                                app.AdjustVolume(mouseData.Mouse.ButtonData == mouseWheelUp);
+                            }
+                        }
                     }
                 }
             }
@@ -193,12 +232,6 @@ namespace KBMixer
             currentConfig.SaveConfig();
         }
 
-        private void appComboBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            //selectedAppName = kbMixerSessions[appComboBox.SelectedIndex].AppName; // Update the selected app name
-            //selectedSessionInstanceIdentifier = kbMixerSessions[appComboBox.SelectedIndex].Sessions[0].GetSessionInstanceIdentifier; // Update the selected session object
-        }
-
         private void buttonHotkeyAdd_Click(object sender, EventArgs e)
         {
             // Update the button text to indicate to user to press a hotkey to set
@@ -215,11 +248,11 @@ namespace KBMixer
         private void buttonHotkeyReset_Click(object sender, EventArgs e)
         {
             // Clear the hotkey array
-            hotkeyVirtualKeys = Array.Empty<int>();
+            hotkeysToListenFor = Array.Empty<int>();
             // Clear the textbox
             textboxHotkeys.Text = "";
             // Update Config Object
-            currentConfig.Hotkeys = hotkeyVirtualKeys;
+            currentConfig.Hotkeys = hotkeysToListenFor;
             // Save config to disk
             currentConfig.SaveConfig();
         }
@@ -230,24 +263,27 @@ namespace KBMixer
             buttonHotkeyAdd.Enabled = true; // re-enable the button to allow a new hotkey to be added
             buttonHotkeyAdd.Text = "Add"; // Reset the button text, maybe make this a constant
 
-            // Check if the hotkey already exists in the array
-            if (!hotkeyVirtualKeys.Contains(virtualKey))
+            // Check if the hotkey already exists in the current config's hotkeys array
+            if (!currentConfig.Hotkeys.Contains(virtualKey))
             {
-                // Add the hotkey to the array
-                hotkeyVirtualKeys = hotkeyVirtualKeys.Append(virtualKey).ToArray();
+                // Add the hotkey to the current config's hotkeys array
+                currentConfig.Hotkeys = currentConfig.Hotkeys.Append(virtualKey).ToArray();
 
                 // Update the textbox text with the array of hotkeys as a string, in "HK1 + HK2 + HK3" format
-                textboxHotkeys.Text = string.Join(" + ", hotkeyVirtualKeys.Select(key => ((Keys)key).ToString()));
+                textboxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(key => ((Keys)key).ToString()));
+
+                // Save Config to Disk
+                currentConfig.SaveConfig();
+
+                // Append the hotkey to the array of hotkeys to listen for
+                UpdateHotkeysToListenFor();
             }
             else
             {
                 MessageBox.Show("This hotkey is already added.", "Duplicate Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
-            currentConfig.Hotkeys = hotkeyVirtualKeys;
-
-            // Save Config to Disk
-            currentConfig.SaveConfig();
+            
         }
 
         private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
@@ -264,25 +300,31 @@ namespace KBMixer
             Debug.WriteLine("Current Config's ControlSingleSession: " + currentConfig.ControlSingleSession);
             currentConfig.SaveConfig();
         }
-        private void buttonAddManualApp_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void labelConfig_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label1_Click(object sender, EventArgs e)
-        {
-
-        }
 
         private void processIndexSelector_ValueChanged(object sender, EventArgs e)
         {
-            currentConfig.ProcessIndex = (int)processIndexSelector.Value;
-            currentConfig.SaveConfig();
+            var selectedApp = audioApps.FirstOrDefault(app => app.AppFileName == currentConfig.AppFileName);
+            if (selectedApp != null)
+            {
+                int maxIndex = selectedApp.Sessions.Count - 1;
+                if (processIndexSelector.Value < 0 || processIndexSelector.Value > maxIndex)
+                {
+                    // I don't want to risk this message box throwing a warning at startup, especially at system startup if configured as such
+                    // Consider circling back to this. Maybe only display warning for this in the GUI itself
+                    //MessageBox.Show($"The current valid range of processes for the selected app is between 0 and {maxIndex}. Make sure the selected app is actively running, then try again.", "Invalid Process Index", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    processIndexSelector.Value = Math.Clamp(processIndexSelector.Value, 0, maxIndex);
+                }
+                else
+                {
+                    currentConfig.ProcessIndex = (int)processIndexSelector.Value;
+                    currentConfig.SaveConfig();
+                }
+            }
+            else
+            {
+                // This throws the error even when creating a new config from scratch
+                //MessageBox.Show("Selected audio app not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void buttonSaveConfig_Click(object sender, EventArgs e)
@@ -290,15 +332,6 @@ namespace KBMixer
             currentConfig.SaveConfig();
         }
 
-        private void textBoxEnter_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
         private void buttonNewConfig_Click(object sender, EventArgs e)
         {
             // Create a new config with default values

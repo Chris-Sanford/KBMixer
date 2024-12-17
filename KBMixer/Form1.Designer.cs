@@ -118,7 +118,6 @@
             labelConfig.Size = new Size(43, 15);
             labelConfig.TabIndex = 12;
             labelConfig.Text = "Config";
-            labelConfig.Click += labelConfig_Click;
             // 
             // comboBoxConfig
             // 
@@ -218,7 +217,6 @@
             textBoxAppSelected.ReadOnly = true;
             textBoxAppSelected.Size = new Size(275, 23);
             textBoxAppSelected.TabIndex = 24;
-            textBoxAppSelected.TextChanged += textBoxEnter_TextChanged;
             // 
             // buttonAppSet
             // 
@@ -266,7 +264,6 @@
             Controls.Add(deviceComboBox);
             Name = "Form1";
             Text = "KBMixer";
-            Load += Form1_Load;
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).EndInit();
             ResumeLayout(false);
             PerformLayout();

@@ -28,6 +28,37 @@ namespace KBMixer
         public required string AppFriendlyName { get; set; } // To display in GUI, esp. for System Sounds
         public required string AppFileName { get; set; } // In case of SystemSounds, GUID
         public required List<AudioSessionControl> Sessions { get; set; } // Collection of Sessions for this App
+
+        public void AdjustVolume(bool isUp, int? processIndex = null)
+        {
+            // Adjust Volume of Specific Process
+            if (processIndex.HasValue && processIndex.Value >= 0 && processIndex.Value < Sessions.Count)
+            {
+                var session = Sessions[processIndex.Value];
+                if (isUp)
+                {
+                    session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + volumeIncrement);
+                }
+                else
+                {
+                    session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - volumeIncrement);
+                }
+            }
+            else // Adjust Volume of All Processes for the Specified App
+            {
+                foreach (var session in Sessions)
+                {
+                    if (isUp)
+                    {
+                        session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + volumeIncrement);
+                    }
+                    else
+                    {
+                        session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - volumeIncrement);
+                    }
+                }
+            }
+        }
     }
 
     // Class that contains methods to interact with the audio sessions
@@ -35,14 +66,6 @@ namespace KBMixer
     public static class Audio 
     {
         public const string systemSoundsId = "%b#";
-
-        //private MMDevice? selectedDevice; // Store the selected device object in a class-level scope
-        //private string selectedAppName; // To control per-app
-        //private string selectedSessionInstanceIdentifier; // To control per-session/process
-        //private KBMixerSession[]? kbMixerSessions; // to control per-app
-        //private SessionCollection naudioSessions; // to control per-session/process
-        //private bool controlSingleAppProcess = false;
-        //private int indexOfProcessToControl = 0;
 
         public static AudioDevice[] GetAudioDevices()
         {
