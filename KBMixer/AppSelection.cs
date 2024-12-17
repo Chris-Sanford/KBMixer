@@ -15,7 +15,7 @@ namespace KBMixer
     {
         // Default to selecting an active app, false means get value for manual entry
         private bool isSelect = true;
-        public string? SelectedAppFileName { get; private set; }
+        public string? SelectedAppFriendlyName { get; private set; }
 
         public AppSelection(AudioApp[] audioApps, string appFileName)
         {
@@ -52,9 +52,13 @@ namespace KBMixer
         private void PopulateActiveAppsSelection(AudioApp[] audioApps)
         {
             comboBoxSelect.Items.Clear();
+            var uniqueAppNames = new HashSet<string>();
             foreach (var app in audioApps)
             {
-                comboBoxSelect.Items.Add(app.AppFriendlyName);
+                if (uniqueAppNames.Add(app.AppFriendlyName))
+                {
+                    comboBoxSelect.Items.Add(app.AppFriendlyName);
+                }
             }
         }
 
@@ -81,7 +85,7 @@ namespace KBMixer
                     MessageBox.Show("Please select an application from the list.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                SelectedAppFileName = comboBoxSelect.SelectedItem.ToString();
+                SelectedAppFriendlyName = comboBoxSelect.SelectedItem.ToString();
             }
             else
             {
@@ -90,9 +94,8 @@ namespace KBMixer
                     MessageBox.Show("Please enter a valid application file name (e.g., chrome.exe).", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                SelectedAppFileName = textBoxEnter.Text;
+                SelectedAppFriendlyName = textBoxEnter.Text;
             }
-            Debug.WriteLine("SelectedAppFileName: " + SelectedAppFileName);
             this.DialogResult = DialogResult.OK;
             this.Close();
         }

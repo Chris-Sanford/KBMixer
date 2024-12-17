@@ -34,10 +34,12 @@ namespace KBMixer
             audioDevices = Audio.GetAudioDevices();
 
             // Load all Audio Apps into Memory
+            var audioAppsList = new List<AudioApp>();
             foreach (var device in audioDevices)
             {
-                audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
+                audioAppsList.AddRange(Audio.GetAudioDeviceApps(device.MMDevice));
             }
+            audioApps = audioAppsList.ToArray();
 
             // Get Configs from Disk, if exists
             configs = Configurations.LoadConfigsFromDisk();
@@ -107,7 +109,6 @@ namespace KBMixer
             {
                 hotkeysHeld = hotkeysHeld.Where(key => key != virtualKey).ToArray();
             }
-            Debug.WriteLine("Hotkeys Held: " + string.Join(", ", hotkeysHeld.Select(key => ((Keys)key).ToString())));
         }
 
         // override the original WndProc method to process raw input messages
@@ -210,7 +211,7 @@ namespace KBMixer
                 }
                 else
                 {
-                    MessageBox.Show("Audio device from configuration is not available. Please set a desired Audio Output Device.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    //MessageBox.Show("Audio device from configuration is not available. Please set a desired Audio Output Device.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
 
@@ -220,7 +221,7 @@ namespace KBMixer
 
         private void PopulateAudioAppSelection()
         {
-            textBoxAppSelected.Text = currentConfig.AppFileName;
+            textBoxAppSelected.Text = currentConfig.AppFriendlyName;
         }
 
         private void PopulateHotkeys()
@@ -312,7 +313,6 @@ namespace KBMixer
             {
                 processIndexSelector.Enabled = false;
             }
-            Debug.WriteLine("Current Config's ControlSingleSession: " + currentConfig.ControlSingleSession);
             currentConfig.SaveConfig();
         }
 
@@ -354,7 +354,8 @@ namespace KBMixer
             {
                 ConfigId = Guid.NewGuid(),
                 DeviceId = audioDevices[0].MMDevice.ID,
-                AppFileName = "System Sounds",
+                AppFileName = "%b#",
+                AppFriendlyName = "System Sounds",
                 Hotkeys = Array.Empty<int>(),
                 ControlSingleSession = false,
                 ProcessIndex = 0
@@ -418,16 +419,17 @@ namespace KBMixer
             {
                 if (appSelectionForm.ShowDialog() == DialogResult.OK)
                 {
-                    // Get SelectedAppFileName from appSelectionForm
-                    string selectedAppFileName = appSelectionForm.SelectedAppFileName;
+                    // Get SelectedAppFriendlyName from appSelectionForm
+                    string selectedAppFriendlyName = appSelectionForm.SelectedAppFriendlyName;
 
-                    Debug.WriteLine("SelectedAppFileName in Form1: " + selectedAppFileName);
+                    // Match the Selected App Friendly Name to the App File Name
+                    string selectedAppFileName = audioApps.First(app => app.AppFriendlyName == selectedAppFriendlyName).AppFileName;
 
                     // Update the current config's AppFileName
                     currentConfig.AppFileName = selectedAppFileName;
 
                     // Update the textbox text with the selected app name
-                    textBoxAppSelected.Text = selectedAppFileName;
+                    textBoxAppSelected.Text = selectedAppFriendlyName;
 
                     // Save the current config
                     currentConfig.SaveConfig();
