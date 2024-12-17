@@ -24,6 +24,10 @@ namespace KBMixer
         public Form1()
         {
             InitializeComponent();
+
+            this.Resize += new EventHandler(MainForm_Resize);
+            trayIcon.Click += new EventHandler(TrayIcon_Click);
+
             RegisterRawInputDevices();
 
             // Load all Audio Devices into Memory
@@ -33,11 +37,6 @@ namespace KBMixer
             foreach (var device in audioDevices)
             {
                 audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
-            }
-
-            foreach (var app in audioApps)
-            {
-                Debug.WriteLine("AUDIO APP SESSION ID: " + app.Sessions[0].GetSessionInstanceIdentifier);
             }
 
             // Get Configs from Disk, if exists
@@ -56,6 +55,22 @@ namespace KBMixer
 
             // Update the array of hotkeys to listen for from all available configs
             UpdateHotkeysToListenFor();
+        }
+
+        void MainForm_Resize(object sender, EventArgs e)
+        {
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                trayIcon.Visible = true;
+                this.Hide();
+            }
+        }
+
+        void TrayIcon_Click(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            trayIcon.Visible = false;
         }
 
         public void LoadConfigToForm()
