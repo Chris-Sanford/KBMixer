@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             deviceComboBox = new ComboBox();
             deviceLabel = new Label();
             appLabel = new Label();
@@ -262,6 +263,7 @@
             Controls.Add(appLabel);
             Controls.Add(deviceLabel);
             Controls.Add(deviceComboBox);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Form1";
             Text = "KBMixer";
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).EndInit();
