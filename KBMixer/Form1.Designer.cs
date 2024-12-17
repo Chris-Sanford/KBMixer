@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             deviceComboBox = new ComboBox();
             deviceLabel = new Label();
@@ -48,6 +49,7 @@
             textBoxAppSelected = new TextBox();
             buttonAppSet = new Button();
             labelInstructions = new Label();
+            trayIcon = new NotifyIcon(components);
             ((System.ComponentModel.ISupportInitialize)processIndexSelector).BeginInit();
             SuspendLayout();
             // 
@@ -234,16 +236,22 @@
             labelInstructions.AutoSize = true;
             labelInstructions.Location = new Point(56, 171);
             labelInstructions.Name = "labelInstructions";
-            labelInstructions.Size = new Size(366, 45);
+            labelInstructions.Size = new Size(366, 75);
             labelInstructions.TabIndex = 27;
-            labelInstructions.Text = "Once you've configured KBMixer as desired,\nhold the required hotkeys and scroll up or down with your mouse to\nadjust the volume of the selected app from anywhere.";
+            labelInstructions.Text = resources.GetString("labelInstructions.Text");
             labelInstructions.TextAlign = ContentAlignment.MiddleCenter;
+            // 
+            // trayIcon
+            // 
+            trayIcon.Icon = (Icon)resources.GetObject("trayIcon.Icon");
+            trayIcon.Text = "KBMixer";
+            trayIcon.Visible = true;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(482, 225);
+            ClientSize = new Size(488, 256);
             Controls.Add(labelInstructions);
             Controls.Add(buttonAppSet);
             Controls.Add(textBoxAppSelected);
@@ -292,5 +300,6 @@
         private TextBox textBoxAppSelected;
         private Button buttonAppSet;
         private Label labelInstructions;
+        private NotifyIcon trayIcon;
     }
 }
