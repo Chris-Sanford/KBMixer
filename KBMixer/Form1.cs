@@ -399,19 +399,25 @@ namespace KBMixer
             // Select the first config in the combo box
             comboBoxConfig.SelectedIndex = 0;
         }
-        private void buttonRefreshAudio_Click(object sender, EventArgs e)
+        private void RefreshAudioDevicesAndApps()
         {
             // Load all Audio Devices into Memory
             audioDevices = Audio.GetAudioDevices();
 
             // Load all Audio Apps into Memory
+            var audioAppsList = new List<AudioApp>();
             foreach (var device in audioDevices)
             {
-                audioApps = Audio.GetAudioDeviceApps(device.MMDevice);
+                audioAppsList.AddRange(Audio.GetAudioDeviceApps(device.MMDevice));
             }
+            audioApps = audioAppsList.ToArray();
 
             // Repopulate the audio devices in the GUI
             PopulateAudioDevices();
+        }
+        private void buttonRefreshAudio_Click(object sender, EventArgs e)
+        {
+            RefreshAudioDevicesAndApps();
         }
         private void OpenAppSelectionForm(AudioApp[] audioApps, string appFileName)
         {
