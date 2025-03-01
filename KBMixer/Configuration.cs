@@ -11,6 +11,7 @@ namespace KBMixer
         public Guid ConfigId { get; set; }
         public required string DeviceId { get; set; }
         public required string AppFileName { get; set; }
+        public required string AppFriendlyName { get; set; }
         public required int[] Hotkeys { get; set; }
         public required bool ControlSingleSession { get; set; } = false;
         public required int ProcessIndex { get; set; } = 0;
@@ -45,7 +46,6 @@ namespace KBMixer
             {
                 try
                 {
-                    Debug.WriteLine($"Deleting config: {filePath}");
                     File.Delete(filePath);
                 }
                 catch (IOException ex)

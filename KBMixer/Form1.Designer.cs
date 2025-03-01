@@ -201,6 +201,7 @@
             buttonRefreshAudio.TabIndex = 22;
             buttonRefreshAudio.Text = "Refresh";
             buttonRefreshAudio.UseVisualStyleBackColor = true;
+            buttonRefreshAudio.Click += buttonRefreshAudio_Click;
             // 
             // buttonDeleteConfig
             // 
