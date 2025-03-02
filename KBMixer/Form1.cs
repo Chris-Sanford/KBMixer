@@ -232,7 +232,40 @@ namespace KBMixer
         private void PopulateProcessControls()
         {
             checkBoxControlSingleAppProcess.Checked = currentConfig.ControlSingleSession;
-            processIndexSelector.Value = currentConfig.ProcessIndex;
+            
+            // Get the selected app to determine the valid range for process index
+            var selectedApp = audioApps.FirstOrDefault(app => app.AppFileName == currentConfig.AppFileName);
+            if (selectedApp != null && selectedApp.Sessions.Count > 0)
+            {
+                int maxIndex = selectedApp.Sessions.Count - 1;
+                processIndexSelector.Minimum = 0;
+                processIndexSelector.Maximum = maxIndex;
+                
+                // Ensure the current value is within valid range
+                if (currentConfig.ProcessIndex > maxIndex)
+                {
+                    currentConfig.ProcessIndex = maxIndex;
+                    processIndexSelector.Value = maxIndex;
+                }
+                else
+                {
+                    processIndexSelector.Value = currentConfig.ProcessIndex;
+                }
+                
+                processIndexSelector.Enabled = currentConfig.ControlSingleSession;
+            }
+            else
+            {
+                // No sessions available, disable the control
+                processIndexSelector.Value = 0;
+                processIndexSelector.Enabled = false;
+                
+                // If control single session is enabled but there are no sessions, update the config
+                if (currentConfig.ControlSingleSession)
+                {
+                    currentConfig.ProcessIndex = 0;
+                }
+            }
         }
 
         private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
@@ -307,7 +340,34 @@ namespace KBMixer
             currentConfig.ControlSingleSession = checkBoxControlSingleAppProcess.Checked;
             if (currentConfig.ControlSingleSession)
             {
-                processIndexSelector.Enabled = true;
+                // Get the selected app to determine the valid range for process index
+                var selectedApp = audioApps.FirstOrDefault(app => app.AppFileName == currentConfig.AppFileName);
+                if (selectedApp != null && selectedApp.Sessions.Count > 0)
+                {
+                    int maxIndex = selectedApp.Sessions.Count - 1;
+                    processIndexSelector.Minimum = 0;
+                    processIndexSelector.Maximum = maxIndex;
+                    
+                    // Ensure the current value is within valid range
+                    if (currentConfig.ProcessIndex > maxIndex)
+                    {
+                        currentConfig.ProcessIndex = maxIndex;
+                        processIndexSelector.Value = maxIndex;
+                    }
+                    else
+                    {
+                        processIndexSelector.Value = currentConfig.ProcessIndex;
+                    }
+                    
+                    processIndexSelector.Enabled = true;
+                }
+                else
+                {
+                    // No sessions available, disable the control
+                    processIndexSelector.Value = 0;
+                    processIndexSelector.Enabled = false;
+                    currentConfig.ProcessIndex = 0;
+                }
             }
             else
             {
@@ -322,23 +382,29 @@ namespace KBMixer
             if (selectedApp != null)
             {
                 int maxIndex = selectedApp.Sessions.Count - 1;
-                if (processIndexSelector.Value < 0 || processIndexSelector.Value > maxIndex)
+                if (maxIndex < 0)
                 {
-                    // I don't want to risk this message box throwing a warning at startup, especially at system startup if configured as such
-                    // Consider circling back to this. Maybe only display warning for this in the GUI itself
-                    //MessageBox.Show($"The current valid range of processes for the selected app is between 0 and {maxIndex}. Make sure the selected app is actively running, then try again.", "Invalid Process Index", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    processIndexSelector.Value = Math.Clamp(processIndexSelector.Value, 0, maxIndex);
+                    // No sessions available
+                    processIndexSelector.Enabled = false;
+                    processIndexSelector.Value = 0;
+                    currentConfig.ProcessIndex = 0;
                 }
                 else
                 {
+                    // Set the minimum and maximum values for the NumericUpDown control
+                    processIndexSelector.Minimum = 0;
+                    processIndexSelector.Maximum = maxIndex;
+                    
+                    // Ensure the value is within valid range
+                    if (processIndexSelector.Value > maxIndex)
+                    {
+                        processIndexSelector.Value = maxIndex;
+                    }
+                    
+                    // Update the config with the new process index
                     currentConfig.ProcessIndex = (int)processIndexSelector.Value;
                     currentConfig.SaveConfig();
                 }
-            }
-            else
-            {
-                // This throws the error even when creating a new config from scratch
-                //MessageBox.Show("Selected audio app not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -414,6 +480,9 @@ namespace KBMixer
 
             // Repopulate the audio devices in the GUI
             PopulateAudioDevices();
+            
+            // Update process controls to reflect the current state of audio sessions
+            PopulateProcessControls();
         }
         private void buttonRefreshAudio_Click(object sender, EventArgs e)
         {
@@ -431,11 +500,18 @@ namespace KBMixer
                     // Match the Selected App Friendly Name to the App File Name
                     string selectedAppFileName = audioApps.First(app => app.AppFriendlyName == selectedAppFriendlyName).AppFileName;
 
-                    // Update the current config's AppFileName
+                    // Update the current config's AppFileName and AppFriendlyName
                     currentConfig.AppFileName = selectedAppFileName;
+                    currentConfig.AppFriendlyName = selectedAppFriendlyName;
 
                     // Update the textbox text with the selected app name
                     textBoxAppSelected.Text = selectedAppFriendlyName;
+                    
+                    // Reset process index to 0 when changing apps
+                    currentConfig.ProcessIndex = 0;
+                    
+                    // Update process controls to reflect the new app's sessions
+                    PopulateProcessControls();
 
                     // Save the current config
                     currentConfig.SaveConfig();
