@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
+using System.Text;
+using System.Windows.Forms;
 
 namespace KBMixer
 {
@@ -71,15 +73,61 @@ namespace KBMixer
 
             var configFiles = Directory.GetFiles(kbmixerPath, "*.json");
             var configs = new List<Config>();
+            var failedConfigs = new List<(string FilePath, string JsonContent)>();
 
             foreach (var configFile in configFiles)
             {
-                string jsonString = File.ReadAllText(configFile);
-                var config = JsonSerializer.Deserialize<Config>(jsonString);
-                if (config != null)
+                try
                 {
-                    configs.Add(config);
+                    string jsonString = File.ReadAllText(configFile);
+                    var config = JsonSerializer.Deserialize<Config>(jsonString);
+                    if (config != null)
+                    {
+                        configs.Add(config);
+                    }
+                    else
+                    {
+                        failedConfigs.Add((configFile, jsonString));
+                    }
                 }
+                catch (Exception ex)
+                {
+                    // Capture the file path and content for failed deserialization
+                    string jsonContent = string.Empty;
+                    try
+                    {
+                        jsonContent = File.ReadAllText(configFile);
+                    }
+                    catch
+                    {
+                        jsonContent = "[Unable to read file content]";
+                    }
+                    failedConfigs.Add((configFile, jsonContent));
+                }
+            }
+
+            // Handle failed configurations
+            if (failedConfigs.Count > 0)
+            {
+                StringBuilder messageBuilder = new StringBuilder();
+                messageBuilder.AppendLine("Failed to load one or more configurations. These configurations will be deleted:");
+                
+                foreach (var (filePath, jsonContent) in failedConfigs)
+                {
+                    messageBuilder.AppendLine($"\nFile: {Path.GetFileName(filePath)}");
+                    messageBuilder.AppendLine($"Content: {jsonContent}");
+                    
+                    try
+                    {
+                        File.Delete(filePath);
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        messageBuilder.AppendLine($"Failed to delete file: {deleteEx.Message}");
+                    }
+                }
+                
+                MessageBox.Show(messageBuilder.ToString(), "Configuration Load Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
             return configs.ToArray();
