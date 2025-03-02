@@ -104,6 +104,7 @@ namespace KBMixer
             if (hotkeysToListenFor.Contains(virtualKey) && keyUp == false && !hotkeysHeld.Contains(virtualKey))
             {
                 hotkeysHeld = hotkeysHeld.Append(virtualKey).ToArray();
+                RefreshAudioDevicesAndApps();
             }
             else if (keyUp) // If the key was released (Flags = Up)
             {
