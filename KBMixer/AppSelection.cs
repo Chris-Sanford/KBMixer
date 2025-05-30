@@ -65,13 +65,28 @@ namespace KBMixer
         // Pre-populate Dialog Based on Existing App Selection
         public void SetAppSelection(string appFileName)
         {
-            if (comboBoxSelect.Items.Contains(appFileName))
+            // First try to find by friendly name in the combo box
+            bool foundInComboBox = false;
+            foreach (var item in comboBoxSelect.Items)
             {
-                comboBoxSelect.SelectedItem = appFileName;
+                if (item.ToString() == appFileName)
+                {
+                    comboBoxSelect.SelectedItem = item;
+                    radioSelect.Checked = true;
+                    foundInComboBox = true;
+                    break;
+                }
             }
-            else
+            
+            // If not found in combo box, set it in the text box for manual entry
+            if (!foundInComboBox)
             {
                 textBoxEnter.Text = appFileName;
+                radioEnter.Checked = true;
+                comboBoxSelect.Enabled = false;
+                textBoxEnter.Enabled = true;
+                textBoxEnter.ReadOnly = false;
+                isSelect = false;
             }
         }
 

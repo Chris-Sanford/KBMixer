@@ -55,6 +55,9 @@ namespace KBMixer
             // Populate Configs into GUI
             PopulateConfigs();
 
+            // Load the current config into the form
+            LoadConfigToForm();
+
             // Update the array of hotkeys to listen for from all available configs
             UpdateHotkeysToListenFor();
         }
@@ -153,8 +156,8 @@ namespace KBMixer
 
                         // Create the array of AudioApps that match the app file names
                         var matchingAudioApps = audioApps
-                            .Where(app => matchingConfigs.Any(config => config.AppFileName == app.AppFileName))
-                            .ToArray();
+                            ?.Where(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && matchingConfigs.Any(config => config.AppFileName == app.AppFileName))
+                            .ToArray() ?? Array.Empty<AudioApp>();
 
                         // Adjust the volume of the audio apps (or the specified session) based on scroll direction
                         foreach (var app in matchingAudioApps)
@@ -235,7 +238,7 @@ namespace KBMixer
             checkBoxControlSingleAppProcess.Checked = currentConfig.ControlSingleSession;
             
             // Get the selected app to determine the valid range for process index
-            var selectedApp = audioApps.FirstOrDefault(app => app.AppFileName == currentConfig.AppFileName);
+            var selectedApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName == currentConfig.AppFileName);
             if (selectedApp != null && selectedApp.Sessions.Count > 0)
             {
                 int maxIndex = selectedApp.Sessions.Count - 1;
@@ -342,7 +345,7 @@ namespace KBMixer
             if (currentConfig.ControlSingleSession)
             {
                 // Get the selected app to determine the valid range for process index
-                var selectedApp = audioApps.FirstOrDefault(app => app.AppFileName == currentConfig.AppFileName);
+                var selectedApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName == currentConfig.AppFileName);
                 if (selectedApp != null && selectedApp.Sessions.Count > 0)
                 {
                     int maxIndex = selectedApp.Sessions.Count - 1;
@@ -379,7 +382,7 @@ namespace KBMixer
 
         private void processIndexSelector_ValueChanged(object sender, EventArgs e)
         {
-            var selectedApp = audioApps.FirstOrDefault(app => app.AppFileName == currentConfig.AppFileName);
+            var selectedApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName == currentConfig.AppFileName);
             if (selectedApp != null)
             {
                 int maxIndex = selectedApp.Sessions.Count - 1;
@@ -491,22 +494,58 @@ namespace KBMixer
         }
         private void OpenAppSelectionForm(AudioApp[] audioApps, string appFileName)
         {
-            using (var appSelectionForm = new AppSelection(audioApps, appFileName))
+            using (var appSelectionForm = new AppSelection(audioApps, currentConfig.AppFriendlyName))
             {
                 if (appSelectionForm.ShowDialog() == DialogResult.OK)
                 {
                     // Get SelectedAppFriendlyName from appSelectionForm
                     string selectedAppFriendlyName = appSelectionForm.SelectedAppFriendlyName;
 
-                    // Match the Selected App Friendly Name to the App File Name
-                    string selectedAppFileName = audioApps.First(app => app.AppFriendlyName == selectedAppFriendlyName).AppFileName;
+                    // Validate the selected app name is not null or empty
+                    if (string.IsNullOrWhiteSpace(selectedAppFriendlyName))
+                    {
+                        MessageBox.Show("Invalid application name selected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    // Try to find the corresponding AudioApp by friendly name first
+                    var matchingApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFriendlyName) && app.AppFriendlyName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
+                    
+                    string selectedAppFileName;
+                    string actualFriendlyName;
+                    
+                    if (matchingApp != null)
+                    {
+                        // Found by friendly name - use the app's actual file name
+                        selectedAppFileName = matchingApp.AppFileName;
+                        actualFriendlyName = matchingApp.AppFriendlyName;
+                    }
+                    else
+                    {
+                        // Not found by friendly name - user probably entered a filename manually
+                        // Try to find by filename
+                        matchingApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
+                        
+                        if (matchingApp != null)
+                        {
+                            // Found by filename - use the app's friendly name
+                            selectedAppFileName = matchingApp.AppFileName;
+                            actualFriendlyName = matchingApp.AppFriendlyName;
+                        }
+                        else
+                        {
+                            // Not found in active apps - assume it's a manual entry
+                            selectedAppFileName = selectedAppFriendlyName;
+                            actualFriendlyName = selectedAppFriendlyName;
+                        }
+                    }
 
                     // Update the current config's AppFileName and AppFriendlyName
                     currentConfig.AppFileName = selectedAppFileName;
-                    currentConfig.AppFriendlyName = selectedAppFriendlyName;
+                    currentConfig.AppFriendlyName = actualFriendlyName;
 
                     // Update the textbox text with the selected app name
-                    textBoxAppSelected.Text = selectedAppFriendlyName;
+                    textBoxAppSelected.Text = actualFriendlyName;
                     
                     // Reset process index to 0 when changing apps
                     currentConfig.ProcessIndex = 0;

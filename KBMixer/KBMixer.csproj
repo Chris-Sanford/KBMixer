@@ -13,6 +13,25 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>embedded</DebugType>
+    
+    <!-- Version Information -->
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    
+    <!-- Assembly Information for Windows Properties -->
+    <AssemblyTitle>KBMixer</AssemblyTitle>
+    <AssemblyDescription>Keyboard and Mouse Audio Mixer - Control application volume with hotkeys and mouse wheel</AssemblyDescription>
+    <AssemblyCompany>Sanford Technologies LLC</AssemblyCompany>
+    <AssemblyProduct>KBMixer</AssemblyProduct>
+    <AssemblyCopyright>Copyright © 2025</AssemblyCopyright>
+    <AssemblyTrademark></AssemblyTrademark>
+    
+    <!-- Additional Properties -->
+    <Product>KBMixer</Product>
+    <Company>Sanford Technologies LLC</Company>
+    <Copyright>Copyright © 2025</Copyright>
+    <Description>Keyboard and Mouse Audio Mixer - Control application volume with hotkeys and mouse wheel</Description>
   </PropertyGroup>
 
   <ItemGroup>
