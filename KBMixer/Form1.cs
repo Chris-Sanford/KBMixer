@@ -38,7 +38,7 @@ namespace KBMixer
         private const int LayoutTwinButtonGap = 6;
         private const int LayoutActionStripWidth = LayoutTwinButtonWidth + LayoutTwinButtonGap + LayoutTwinButtonWidth;
 
-        public Form1()
+        public Form1(bool startMinimized = false)
         {
             InitializeComponent();
 
@@ -81,6 +81,9 @@ namespace KBMixer
             ShowMissingAudioDevicesWarningIfNeeded();
 
             ApplyResponsiveLayout();
+
+            if (startMinimized)
+                WindowState = FormWindowState.Minimized;
         }
 
         private void ApplyResponsiveLayout()

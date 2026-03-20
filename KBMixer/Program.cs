@@ -23,7 +23,10 @@ namespace KBMixer
                 return;
             }
 
-            Application.Run(new Form1());
+            bool startMinimized = args.Any(a =>
+                string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase));
+
+            Application.Run(new Form1(startMinimized));
         }
     }
 }
