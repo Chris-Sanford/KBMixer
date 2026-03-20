@@ -52,6 +52,26 @@ namespace KBMixer
             public int GetHashCode(AudioSessionControl obj) => RuntimeHelpers.GetHashCode(obj);
         }
 
+        /// <summary>Adjust the render endpoint’s master volume (Windows volume mixer level for that device).</summary>
+        public static bool TryAdjustEndpointMasterVolume(MMDevice device, bool isUp, float increment = AudioApp.volumeIncrement)
+        {
+            try
+            {
+                var endpoint = device.AudioEndpointVolume;
+                float current = endpoint.MasterVolumeLevelScalar;
+                float next = isUp
+                    ? Math.Min(1f, current + increment)
+                    : Math.Max(0f, current - increment);
+                endpoint.MasterVolumeLevelScalar = next;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"TryAdjustEndpointMasterVolume: {ex.Message}");
+                return false;
+            }
+        }
+
         /// <summary>Adjust one session by index, or all sessions when <paramref name="processIndex"/> is null or out of range.</summary>
         public static void AdjustSessionsVolume(IReadOnlyList<AudioSessionControl> sessions, bool isUp, int? processIndex = null)
         {

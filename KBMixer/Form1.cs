@@ -28,6 +28,9 @@ namespace KBMixer
         /// <summary>Avoids <see cref="checkBoxOpenAtStartup"/> <c>CheckedChanged</c> while we sync from the registry.</summary>
         private bool suspendOpenAtStartupEvents;
 
+        /// <summary>Avoids <see cref="checkBoxDeviceMasterVolume"/> <c>CheckedChanged</c> while loading config into the form.</summary>
+        private bool suspendDeviceMasterEvents;
+
         /// <summary>
         /// Cached session lists per config id, built at startup / refresh / hotkey-down.
         /// Used by <see cref="WndProc"/> so scroll events never re-enumerate WASAPI.
@@ -207,6 +210,7 @@ namespace KBMixer
             PopulateHotkeys();
             PopulateProcessControls();
             PopulateConfigDisplayNameControl();
+            ApplyVolumeTargetUi();
         }
 
         private string? GetDeviceFriendlyNameForConfig(Config config)
@@ -228,8 +232,13 @@ namespace KBMixer
             var next = new Dictionary<Guid, List<AudioSessionControl>>();
             foreach (var config in configs)
             {
-                var entries = CollectAllMatchingSessionsAcrossDevices(config);
-                next[config.ConfigId] = entries.Select(e => e.Item1).ToList();
+                if (config.ControlDeviceMasterVolume)
+                    next[config.ConfigId] = new List<AudioSessionControl>();
+                else
+                {
+                    var entries = CollectAllMatchingSessionsAcrossDevices(config);
+                    next[config.ConfigId] = entries.Select(e => e.Item1).ToList();
+                }
             }
             cachedSessionsByConfig = next;
         }
@@ -279,6 +288,21 @@ namespace KBMixer
 
         private void RefreshSessionPickerFromAudio()
         {
+            if (currentConfig.ControlDeviceMasterVolume)
+            {
+                suspendSessionPickerEvents = true;
+                try
+                {
+                    comboBoxAudioSession.Items.Clear();
+                    comboBoxAudioSession.Enabled = false;
+                }
+                finally
+                {
+                    suspendSessionPickerEvents = false;
+                }
+                return;
+            }
+
             var entries = CollectAllMatchingSessionsAcrossDevices(currentConfig);
             suspendSessionPickerEvents = true;
             try
@@ -486,6 +510,16 @@ namespace KBMixer
                         foreach (var config in matchingConfigs)
                         {
                             bool isUp = mouseData.Mouse.ButtonData == mouseWheelUp;
+                            if (config.ControlDeviceMasterVolume)
+                            {
+                                var device = audioDevices?
+                                    .FirstOrDefault(d => string.Equals(d.MMDevice.ID, config.DeviceId, StringComparison.OrdinalIgnoreCase))
+                                    ?.MMDevice;
+                                if (device != null)
+                                    Audio.TryAdjustEndpointMasterVolume(device, isUp);
+                                continue;
+                            }
+
                             var sessions = GetCachedSessions(config);
                             if (sessions.Count == 0)
                                 continue;
@@ -558,6 +592,57 @@ namespace KBMixer
         {
             checkBoxControlSingleAppProcess.Checked = currentConfig.ControlSingleSession;
             RefreshSessionPickerFromAudio();
+        }
+
+        private void ApplyVolumeTargetUi()
+        {
+            suspendDeviceMasterEvents = true;
+            try
+            {
+                checkBoxDeviceMasterVolume.Checked = currentConfig.ControlDeviceMasterVolume;
+                bool appMode = !currentConfig.ControlDeviceMasterVolume;
+                appLabel.Enabled = appMode;
+                textBoxAppSelected.Enabled = appMode;
+                buttonAppSet.Enabled = appMode;
+                checkBoxControlSingleAppProcess.Enabled = appMode;
+                labelSession.Enabled = appMode;
+
+                if (!appMode)
+                {
+                    suspendSessionPickerEvents = true;
+                    try
+                    {
+                        comboBoxAudioSession.Items.Clear();
+                        comboBoxAudioSession.Enabled = false;
+                    }
+                    finally
+                    {
+                        suspendSessionPickerEvents = false;
+                    }
+                }
+                else
+                {
+                    RefreshSessionPickerFromAudio();
+                    comboBoxAudioSession.Enabled = currentConfig.ControlSingleSession;
+                }
+            }
+            finally
+            {
+                suspendDeviceMasterEvents = false;
+            }
+        }
+
+        private void checkBoxDeviceMasterVolume_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (suspendDeviceMasterEvents)
+                return;
+
+            currentConfig.ControlDeviceMasterVolume = checkBoxDeviceMasterVolume.Checked;
+            currentConfig.SaveConfig();
+            RebuildSessionCache();
+            ApplyVolumeTargetUi();
+            UpdateConfigComboItemAtSelectedIndex();
+            UpdateConfigDisplayNamePlaceholder();
         }
 
         private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
@@ -680,7 +765,8 @@ namespace KBMixer
                 AppFriendlyName = "System Sounds",
                 Hotkeys = Array.Empty<int>(),
                 ControlSingleSession = false,
-                ProcessIndex = 0
+                ProcessIndex = 0,
+                ControlDeviceMasterVolume = false
             };
 
             // Add the new config to the configs array
@@ -736,6 +822,7 @@ namespace KBMixer
             
             // Update process controls to reflect the current state of audio sessions
             PopulateProcessControls();
+            ApplyVolumeTargetUi();
             RefreshAllConfigComboItemTexts();
             UpdateConfigDisplayNamePlaceholder();
         }

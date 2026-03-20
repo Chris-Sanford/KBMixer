@@ -60,6 +60,20 @@ public class AudioSessionGroupingTests
     }
 
     [Fact]
+    public void TryAdjustEndpointMasterVolume_DoesNotThrow_OnDefaultDevice()
+    {
+        var devices = Audio.GetAudioDevices();
+        Assert.NotEmpty(devices);
+        var device = devices[0].MMDevice;
+        float before = device.AudioEndpointVolume.MasterVolumeLevelScalar;
+        bool okUp = Audio.TryAdjustEndpointMasterVolume(device, isUp: true);
+        bool okDown = Audio.TryAdjustEndpointMasterVolume(device, isUp: false);
+        Assert.True(okUp);
+        Assert.True(okDown);
+        device.AudioEndpointVolume.MasterVolumeLevelScalar = before;
+    }
+
+    [Fact]
     public void CollectSessionsForConfig_DoesNotThrow_OnDefaultDevice()
     {
         var devices = Audio.GetAudioDevices();

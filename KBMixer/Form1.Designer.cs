@@ -32,6 +32,7 @@ namespace KBMixer
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             deviceComboBox = new ComboBox();
             deviceLabel = new Label();
+            checkBoxDeviceMasterVolume = new CheckBox();
             appLabel = new Label();
             checkBoxControlSingleAppProcess = new CheckBox();
             comboBoxAudioSession = new ComboBox();
@@ -79,10 +80,22 @@ namespace KBMixer
             deviceLabel.TabIndex = 1;
             deviceLabel.Text = "Device";
             // 
+            // checkBoxDeviceMasterVolume
+            // 
+            checkBoxDeviceMasterVolume.AccessibleDescription = "When checked, hotkeys and mouse wheel adjust the entire output device volume instead of one app";
+            checkBoxDeviceMasterVolume.AutoSize = true;
+            checkBoxDeviceMasterVolume.Location = new Point(56, 88);
+            checkBoxDeviceMasterVolume.Name = "checkBoxDeviceMasterVolume";
+            checkBoxDeviceMasterVolume.Size = new Size(318, 19);
+            checkBoxDeviceMasterVolume.TabIndex = 31;
+            checkBoxDeviceMasterVolume.Text = "Control output device master volume (all apps on this device)";
+            checkBoxDeviceMasterVolume.UseVisualStyleBackColor = true;
+            checkBoxDeviceMasterVolume.CheckedChanged += checkBoxDeviceMasterVolume_CheckedChanged;
+            // 
             // appLabel
             // 
             appLabel.AutoSize = true;
-            appLabel.Location = new Point(7, 94);
+            appLabel.Location = new Point(7, 149);
             appLabel.Name = "appLabel";
             appLabel.Size = new Size(29, 15);
             appLabel.TabIndex = 3;
@@ -92,7 +105,7 @@ namespace KBMixer
             // 
             checkBoxControlSingleAppProcess.AccessibleDescription = "When checked, volume changes apply only to the audio session selected in the list";
             checkBoxControlSingleAppProcess.AutoSize = true;
-            checkBoxControlSingleAppProcess.Location = new Point(56, 151);
+            checkBoxControlSingleAppProcess.Location = new Point(56, 175);
             checkBoxControlSingleAppProcess.Name = "checkBoxControlSingleAppProcess";
             checkBoxControlSingleAppProcess.Size = new Size(165, 19);
             checkBoxControlSingleAppProcess.TabIndex = 8;
@@ -108,7 +121,7 @@ namespace KBMixer
             comboBoxAudioSession.Enabled = false;
             comboBoxAudioSession.FormattingEnabled = true;
             comboBoxAudioSession.IntegralHeight = false;
-            comboBoxAudioSession.Location = new Point(280, 149);
+            comboBoxAudioSession.Location = new Point(280, 173);
             comboBoxAudioSession.Name = "comboBoxAudioSession";
             comboBoxAudioSession.Size = new Size(220, 23);
             comboBoxAudioSession.TabIndex = 9;
@@ -117,7 +130,7 @@ namespace KBMixer
             // labelSession
             // 
             labelSession.AutoSize = true;
-            labelSession.Location = new Point(7, 154);
+            labelSession.Location = new Point(7, 178);
             labelSession.Name = "labelSession";
             labelSession.Size = new Size(48, 15);
             labelSession.TabIndex = 10;
@@ -180,7 +193,7 @@ namespace KBMixer
             // labelHotkeys
             // 
             labelHotkeys.AutoSize = true;
-            labelHotkeys.Location = new Point(7, 125);
+            labelHotkeys.Location = new Point(7, 118);
             labelHotkeys.Name = "labelHotkeys";
             labelHotkeys.Size = new Size(50, 15);
             labelHotkeys.TabIndex = 13;
@@ -189,7 +202,7 @@ namespace KBMixer
             // textboxHotkeys
             // 
             textboxHotkeys.ImeMode = ImeMode.On;
-            textboxHotkeys.Location = new Point(56, 122);
+            textboxHotkeys.Location = new Point(56, 115);
             textboxHotkeys.Name = "textboxHotkeys";
             textboxHotkeys.PlaceholderText = "Add hotkeys";
             textboxHotkeys.ReadOnly = true;
@@ -198,7 +211,7 @@ namespace KBMixer
             // 
             // buttonHotkeyAdd
             // 
-            buttonHotkeyAdd.Location = new Point(456, 122);
+            buttonHotkeyAdd.Location = new Point(456, 115);
             buttonHotkeyAdd.Name = "buttonHotkeyAdd";
             buttonHotkeyAdd.Size = new Size(64, 23);
             buttonHotkeyAdd.TabIndex = 15;
@@ -208,7 +221,7 @@ namespace KBMixer
             // 
             // buttonHotkeyReset
             // 
-            buttonHotkeyReset.Location = new Point(526, 122);
+            buttonHotkeyReset.Location = new Point(526, 115);
             buttonHotkeyReset.Name = "buttonHotkeyReset";
             buttonHotkeyReset.Size = new Size(64, 23);
             buttonHotkeyReset.TabIndex = 16;
@@ -248,7 +261,7 @@ namespace KBMixer
             // 
             // textBoxAppSelected
             // 
-            textBoxAppSelected.Location = new Point(56, 91);
+            textBoxAppSelected.Location = new Point(56, 146);
             textBoxAppSelected.Name = "textBoxAppSelected";
             textBoxAppSelected.PlaceholderText = "Select an app";
             textBoxAppSelected.ReadOnly = true;
@@ -257,7 +270,7 @@ namespace KBMixer
             // 
             // buttonAppSet
             // 
-            buttonAppSet.Location = new Point(456, 91);
+            buttonAppSet.Location = new Point(456, 146);
             buttonAppSet.Name = "buttonAppSet";
             buttonAppSet.Size = new Size(134, 23);
             buttonAppSet.TabIndex = 26;
@@ -267,7 +280,7 @@ namespace KBMixer
             // 
             // groupBoxHowTo
             // 
-            groupBoxHowTo.Location = new Point(8, 188);
+            groupBoxHowTo.Location = new Point(8, 212);
             groupBoxHowTo.Name = "groupBoxHowTo";
             groupBoxHowTo.Size = new Size(596, 120);
             groupBoxHowTo.TabIndex = 32;
@@ -292,7 +305,7 @@ namespace KBMixer
             checkBoxOpenAtStartup.AccessibleDescription = "Run KBMixer when you sign in to Windows; starts minimized to the notification area";
             checkBoxOpenAtStartup.AccessibleName = "Open at Windows startup";
             checkBoxOpenAtStartup.AutoSize = true;
-            checkBoxOpenAtStartup.Location = new Point(56, 316);
+            checkBoxOpenAtStartup.Location = new Point(56, 340);
             checkBoxOpenAtStartup.Name = "checkBoxOpenAtStartup";
             checkBoxOpenAtStartup.Size = new Size(151, 19);
             checkBoxOpenAtStartup.TabIndex = 33;
@@ -310,9 +323,10 @@ namespace KBMixer
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(612, 392);
+            ClientSize = new Size(612, 416);
             MinimumSize = new Size(520, 360);
             Controls.Add(checkBoxOpenAtStartup);
+            Controls.Add(checkBoxDeviceMasterVolume);
             Controls.Add(buttonResetDisplayName);
             Controls.Add(textBoxConfigDisplayName);
             Controls.Add(labelConfigDisplayName);
@@ -346,6 +360,7 @@ namespace KBMixer
 
         private ComboBox deviceComboBox;
         private Label deviceLabel;
+        private CheckBox checkBoxDeviceMasterVolume;
         private Label appLabel;
         private CheckBox checkBoxControlSingleAppProcess;
         private ComboBox comboBoxAudioSession;
