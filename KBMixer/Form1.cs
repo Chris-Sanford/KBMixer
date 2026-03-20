@@ -25,6 +25,12 @@ namespace KBMixer
         /// <summary>Avoids <see cref="comboBoxAudioSession"/> <c>SelectedIndexChanged</c> while we sync from audio state.</summary>
         private bool suspendSessionPickerEvents;
 
+        /// <summary>
+        /// Cached session lists per config id, built at startup / refresh / hotkey-down.
+        /// Used by <see cref="WndProc"/> so scroll events never re-enumerate WASAPI.
+        /// </summary>
+        private Dictionary<Guid, List<AudioSessionControl>> cachedSessionsByConfig = new();
+
         private const int LayoutFieldLeft = 56;
         private const int LayoutMarginRight = 12;
         private const int LayoutFieldToButtonGap = 8;
@@ -66,6 +72,8 @@ namespace KBMixer
                 PopulateConfigs(0);
                 LoadConfigToForm();
             }
+
+            RebuildSessionCache();
 
             // Update the array of hotkeys to listen for from all available configs
             UpdateHotkeysToListenFor();
@@ -153,6 +161,24 @@ namespace KBMixer
             if (!string.IsNullOrWhiteSpace(config.CustomDisplayName))
                 return config.CustomDisplayName.Trim();
             return config.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(config));
+        }
+
+        /// <summary>Rebuilds <see cref="cachedSessionsByConfig"/> for every config.</summary>
+        private void RebuildSessionCache()
+        {
+            var next = new Dictionary<Guid, List<AudioSessionControl>>();
+            foreach (var config in configs)
+            {
+                var entries = CollectAllMatchingSessionsAcrossDevices(config);
+                next[config.ConfigId] = entries.Select(e => e.Item1).ToList();
+            }
+            cachedSessionsByConfig = next;
+        }
+
+        /// <summary>Returns the cached session list for a config, or an empty list if not cached.</summary>
+        private List<AudioSessionControl> GetCachedSessions(Config config)
+        {
+            return cachedSessionsByConfig.TryGetValue(config.ConfigId, out var list) ? list : new();
         }
 
         /// <summary>
@@ -401,25 +427,14 @@ namespace KBMixer
                         foreach (var config in matchingConfigs)
                         {
                             bool isUp = mouseData.Mouse.ButtonData == mouseWheelUp;
-                            var entries = CollectAllMatchingSessionsAcrossDevices(config);
-                            if (entries.Count == 0)
+                            var sessions = GetCachedSessions(config);
+                            if (sessions.Count == 0)
                                 continue;
 
                             if (config.ControlSingleSession)
-                            {
-                                var sessions = entries.Select(e => e.session).ToList();
                                 Audio.AdjustSessionsVolume(sessions, isUp, config.ProcessIndex);
-                            }
                             else
-                            {
-                                foreach (var (session, _) in entries)
-                                {
-                                    if (isUp)
-                                        session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + AudioApp.volumeIncrement);
-                                    else
-                                        session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - AudioApp.volumeIncrement);
-                                }
-                            }
+                                Audio.AdjustSessionsVolume(sessions, isUp, null);
                         }
                     }
                 }
@@ -654,6 +669,8 @@ namespace KBMixer
                 audioAppsList.AddRange(Audio.GetAudioDeviceApps(device.MMDevice));
             }
             audioApps = audioAppsList.ToArray();
+
+            RebuildSessionCache();
 
             // Repopulate the audio devices in the GUI
             PopulateAudioDevices();
