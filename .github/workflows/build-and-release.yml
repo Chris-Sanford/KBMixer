@@ -51,8 +51,6 @@ jobs:
             Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `main`.
 
             **Download:** `KBMixer.exe` — self-contained **win-x64** single-file publish; run from any folder.
-
-            Bump `<Version>` in `KBMixer/KBMixer.csproj` when you want the release title to reflect a new semantic version; the workflow appends `-r{run_number}` so every push gets a unique tag.
           files: artifacts/publish/KBMixer.exe
           generate_release_notes: true
         env:
