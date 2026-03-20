@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text;
 using System.Windows.Forms;
@@ -90,7 +90,7 @@ namespace KBMixer
                         failedConfigs.Add((configFile, jsonString));
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Capture the file path and content for failed deserialization
                     string jsonContent = string.Empty;

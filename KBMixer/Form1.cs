@@ -47,7 +47,7 @@ namespace KBMixer
             // If there are no configs from disk, create a default config
             if (configs.Length == 0)
             {
-                buttonNewConfig_Click(null, null);
+                buttonNewConfig_Click(this, EventArgs.Empty);
             }
 
             currentConfig = configs[0]; // Set the current config to the first config
@@ -62,7 +62,7 @@ namespace KBMixer
             UpdateHotkeysToListenFor();
         }
 
-        void MainForm_Resize(object sender, EventArgs e)
+        void MainForm_Resize(object? sender, EventArgs e)
         {
             if (this.WindowState == FormWindowState.Minimized)
             {
@@ -71,7 +71,7 @@ namespace KBMixer
             }
         }
 
-        void TrayIcon_Click(object sender, EventArgs e)
+        void TrayIcon_Click(object? sender, EventArgs e)
         {
             this.Show();
             this.WindowState = FormWindowState.Normal;
@@ -278,7 +278,7 @@ namespace KBMixer
             LoadConfigToForm();
         }
 
-        private void deviceComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        private void deviceComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
             // Update current config with the selected device
             currentConfig.DeviceId = audioDevices[deviceComboBox.SelectedIndex].MMDevice.ID;
@@ -298,7 +298,7 @@ namespace KBMixer
             listeningForHotkeyAdd = true;
         }
 
-        private void buttonHotkeyReset_Click(object sender, EventArgs e)
+        private void buttonHotkeyReset_Click(object? sender, EventArgs e)
         {
             // Clear the hotkey array
             hotkeysToListenFor = Array.Empty<int>();
@@ -339,7 +339,7 @@ namespace KBMixer
             
         }
 
-        private void checkBoxControlSingleAppProcess_CheckedChanged(object sender, EventArgs e)
+        private void checkBoxControlSingleAppProcess_CheckedChanged(object? sender, EventArgs e)
         {
             currentConfig.ControlSingleSession = checkBoxControlSingleAppProcess.Checked;
             if (currentConfig.ControlSingleSession)
@@ -412,7 +412,7 @@ namespace KBMixer
             }
         }
 
-        private void buttonSaveConfig_Click(object sender, EventArgs e)
+        private void buttonSaveConfig_Click(object? sender, EventArgs e)
         {
             currentConfig.SaveConfig();
         }
@@ -447,7 +447,7 @@ namespace KBMixer
             comboBoxConfig.SelectedIndex = configs.Length - 1;
         }
 
-        private void buttonDeleteConfig_Click(object sender, EventArgs e)
+        private void buttonDeleteConfig_Click(object? sender, EventArgs e)
         {
             // If there is only one config left, show a warning message and return
             if (configs.Length == 1)
@@ -499,7 +499,7 @@ namespace KBMixer
                 if (appSelectionForm.ShowDialog() == DialogResult.OK)
                 {
                     // Get SelectedAppFriendlyName from appSelectionForm
-                    string selectedAppFriendlyName = appSelectionForm.SelectedAppFriendlyName;
+                    string? selectedAppFriendlyName = appSelectionForm.SelectedAppFriendlyName;
 
                     // Validate the selected app name is not null or empty
                     if (string.IsNullOrWhiteSpace(selectedAppFriendlyName))
@@ -559,7 +559,7 @@ namespace KBMixer
             }
         }
 
-        private void buttonAppSet_Click(object sender, EventArgs e)
+        private void buttonAppSet_Click(object? sender, EventArgs e)
         {
             OpenAppSelectionForm(audioApps, currentConfig.AppFileName);
         }
