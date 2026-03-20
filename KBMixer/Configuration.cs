@@ -18,6 +18,20 @@ namespace KBMixer
         public required bool ControlSingleSession { get; set; } = false;
         public required int ProcessIndex { get; set; } = 0;
 
+        /// <summary>When set, shown in the config list instead of the auto-generated name.</summary>
+        public string? CustomDisplayName { get; set; }
+
+        /// <summary>User-facing name derived from app, hotkeys, and device (see issue #37).</summary>
+        public string GetAutoDisplayName(string? deviceFriendlyName)
+        {
+            string app = string.IsNullOrWhiteSpace(AppFriendlyName) ? "(no app)" : AppFriendlyName;
+            string keys = Hotkeys.Length == 0
+                ? "(no hotkeys)"
+                : string.Join(" + ", Hotkeys.Select(KeyDisplayNames.GetDisplayName));
+            string dev = string.IsNullOrWhiteSpace(deviceFriendlyName) ? "(unknown device)" : deviceFriendlyName;
+            return $"Control {app} with {keys} on {dev}";
+        }
+
         public void SaveConfig()
         {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);

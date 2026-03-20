@@ -398,3 +398,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Local agent UI verification snapshot
+kbmixer-ui-verify.png

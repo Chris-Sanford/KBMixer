@@ -16,10 +16,17 @@ namespace KBMixer
         public AudioDevice[] audioDevices; // Array of Audio Devices to Control
         public AudioApp[] audioApps; // Array of Audio Apps to Control
         public Config[] configs; // Array of Configurations to Load
-        public Config currentConfig; // Current Configuration of the Application
+        public Config currentConfig = null!; // Set during startup (LoadConfigs or New Config)
         public int[] hotkeysToListenFor = Array.Empty<int>(); // Array of Hotkeys to Listen For
         public int[] hotkeysHeld = Array.Empty<int>(); // Array of Hotkeys that are currently being held down
         public bool listeningForHotkeyAdd = false;
+
+        private const int LayoutFieldLeft = 56;
+        private const int LayoutMarginRight = 12;
+        private const int LayoutFieldToButtonGap = 8;
+        private const int LayoutTwinButtonWidth = 64;
+        private const int LayoutTwinButtonGap = 6;
+        private const int LayoutActionStripWidth = LayoutTwinButtonWidth + LayoutTwinButtonGap + LayoutTwinButtonWidth;
 
         public Form1()
         {
@@ -44,26 +51,63 @@ namespace KBMixer
             // Get Configs from Disk, if exists
             configs = Configurations.LoadConfigsFromDisk();
 
-            // If there are no configs from disk, create a default config
+            // If there are no configs from disk, create a default config (populates UI)
             if (configs.Length == 0)
             {
                 buttonNewConfig_Click(this, EventArgs.Empty);
             }
-
-            currentConfig = configs[0]; // Set the current config to the first config
-
-            // Populate Configs into GUI
-            PopulateConfigs();
-
-            // Load the current config into the form
-            LoadConfigToForm();
+            else
+            {
+                currentConfig = configs[0];
+                PopulateConfigs(0);
+                LoadConfigToForm();
+            }
 
             // Update the array of hotkeys to listen for from all available configs
             UpdateHotkeysToListenFor();
+
+            ApplyResponsiveLayout();
+        }
+
+        private void ApplyResponsiveLayout()
+        {
+            if (!IsHandleCreated || WindowState == FormWindowState.Minimized)
+                return;
+
+            int cw = ClientSize.Width;
+            int btnRight = cw - LayoutMarginRight;
+
+            buttonDeleteConfig.Left = btnRight - LayoutTwinButtonWidth;
+            buttonNewConfig.Left = btnRight - LayoutActionStripWidth;
+
+            buttonHotkeyReset.Left = btnRight - LayoutTwinButtonWidth;
+            buttonHotkeyAdd.Left = btnRight - LayoutActionStripWidth;
+
+            int singleLeft = btnRight - LayoutActionStripWidth;
+            buttonResetDisplayName.Left = singleLeft;
+            buttonRefreshAudio.Left = singleLeft;
+            buttonAppSet.Left = singleLeft;
+
+            int fieldWidth = singleLeft - LayoutFieldToButtonGap - LayoutFieldLeft;
+            if (fieldWidth < 180)
+                fieldWidth = 180;
+
+            comboBoxConfig.Width = fieldWidth;
+            textBoxConfigDisplayName.Width = fieldWidth;
+            deviceComboBox.Width = fieldWidth;
+            textBoxAppSelected.Width = fieldWidth;
+            textboxHotkeys.Width = fieldWidth;
+
+            labelInstructions.Left = LayoutFieldLeft;
+            labelInstructions.Width = Math.Max(200, cw - LayoutFieldLeft - LayoutMarginRight);
+
+            SyncConfigComboDropDownWidth();
         }
 
         void MainForm_Resize(object? sender, EventArgs e)
         {
+            ApplyResponsiveLayout();
+
             if (this.WindowState == FormWindowState.Minimized)
             {
                 trayIcon.Visible = true;
@@ -85,6 +129,90 @@ namespace KBMixer
             PopulateAudioAppSelection();
             PopulateHotkeys();
             PopulateProcessControls();
+            PopulateConfigDisplayNameControl();
+        }
+
+        private string? GetDeviceFriendlyNameForConfig(Config config)
+        {
+            var device = audioDevices?.FirstOrDefault(d => d.MMDevice.ID == config.DeviceId);
+            return device?.MMDevice.FriendlyName;
+        }
+
+        private string GetConfigListDisplayName(Config config)
+        {
+            if (!string.IsNullOrWhiteSpace(config.CustomDisplayName))
+                return config.CustomDisplayName.Trim();
+            return config.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(config));
+        }
+
+        private void PopulateConfigDisplayNameControl()
+        {
+            textBoxConfigDisplayName.Text = currentConfig.CustomDisplayName ?? "";
+            UpdateConfigDisplayNamePlaceholder();
+        }
+
+        private void UpdateConfigDisplayNamePlaceholder()
+        {
+            textBoxConfigDisplayName.PlaceholderText = currentConfig.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(currentConfig));
+        }
+
+        private void UpdateConfigComboItemAtSelectedIndex()
+        {
+            int i = comboBoxConfig.SelectedIndex;
+            if (i >= 0 && i < configs.Length)
+                comboBoxConfig.Items[i] = GetConfigListDisplayName(configs[i]);
+            SyncConfigComboDropDownWidth();
+        }
+
+        private void RefreshAllConfigComboItemTexts()
+        {
+            for (int i = 0; i < configs.Length && i < comboBoxConfig.Items.Count; i++)
+                comboBoxConfig.Items[i] = GetConfigListDisplayName(configs[i]);
+            SyncConfigComboDropDownWidth();
+        }
+
+        private void SyncConfigComboDropDownWidth()
+        {
+            if (comboBoxConfig.Items.Count == 0)
+                return;
+            int maxWidth = comboBoxConfig.Width;
+            foreach (var item in comboBoxConfig.Items)
+            {
+                if (item is string text)
+                {
+                    int w = TextRenderer.MeasureText(text, comboBoxConfig.Font).Width
+                        + SystemInformation.VerticalScrollBarWidth + 8;
+                    if (w > maxWidth)
+                        maxWidth = w;
+                }
+            }
+            comboBoxConfig.DropDownWidth = Math.Min(maxWidth, 900);
+        }
+
+        private void textBoxConfigDisplayName_Leave(object? sender, EventArgs e)
+        {
+            if (comboBoxConfig.SelectedIndex < 0)
+                return;
+
+            string trimmed = textBoxConfigDisplayName.Text.Trim();
+            string auto = currentConfig.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(currentConfig));
+            if (string.IsNullOrEmpty(trimmed) || string.Equals(trimmed, auto, StringComparison.OrdinalIgnoreCase))
+                currentConfig.CustomDisplayName = null;
+            else
+                currentConfig.CustomDisplayName = trimmed;
+
+            textBoxConfigDisplayName.Text = currentConfig.CustomDisplayName ?? "";
+            currentConfig.SaveConfig();
+            UpdateConfigComboItemAtSelectedIndex();
+            UpdateConfigDisplayNamePlaceholder();
+        }
+
+        private void buttonResetDisplayName_Click(object? sender, EventArgs e)
+        {
+            currentConfig.CustomDisplayName = null;
+            currentConfig.SaveConfig();
+            PopulateConfigDisplayNameControl();
+            UpdateConfigComboItemAtSelectedIndex();
         }
 
         public void RegisterRawInputDevices()
@@ -178,21 +306,25 @@ namespace KBMixer
             base.WndProc(ref m); // Continue processing the message as WndProc normally would
         }
 
-        // Specifically only for populating Configs into ComboBox
-        // NOT getting the config objects themselves
-        private void PopulateConfigs()
+        // Populate config combo with friendly names (auto or custom); keep configs[] in sync.
+        private void PopulateConfigs(int selectedIndex)
         {
-            // Clear the combo box
-            comboBoxConfig.Items.Clear();
-            // Loop through all configs
-            foreach (var config in configs)
+            comboBoxConfig.BeginUpdate();
+            try
             {
-                // Add each config to the combo box
-                comboBoxConfig.Items.Add(config.ConfigId);
+                comboBoxConfig.Items.Clear();
+                foreach (var config in configs)
+                    comboBoxConfig.Items.Add(GetConfigListDisplayName(config));
+
+                int idx = Math.Clamp(selectedIndex, 0, Math.Max(0, configs.Length - 1));
+                currentConfig = configs[idx];
+                comboBoxConfig.SelectedIndex = idx;
             }
-            // Select the first config in the combo box
-            comboBoxConfig.SelectedIndex = 0;
-            currentConfig = configs[0];
+            finally
+            {
+                comboBoxConfig.EndUpdate();
+            }
+            SyncConfigComboDropDownWidth();
         }
 
         private void PopulateAudioDevices()
@@ -274,7 +406,14 @@ namespace KBMixer
 
         private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
         {
-            currentConfig = configs[comboBoxConfig.SelectedIndex]; // Update the current config object
+            if (comboBoxConfig.SelectedIndex < 0 || comboBoxConfig.SelectedIndex >= configs.Length)
+                return;
+
+            var next = configs[comboBoxConfig.SelectedIndex];
+            if (ReferenceEquals(next, currentConfig))
+                return;
+
+            currentConfig = next;
             LoadConfigToForm();
         }
 
@@ -283,6 +422,8 @@ namespace KBMixer
             // Update current config with the selected device
             currentConfig.DeviceId = audioDevices[deviceComboBox.SelectedIndex].MMDevice.ID;
             currentConfig.SaveConfig();
+            UpdateConfigComboItemAtSelectedIndex();
+            UpdateConfigDisplayNamePlaceholder();
         }
 
         private void buttonHotkeyAdd_Click(object sender, EventArgs e)
@@ -308,6 +449,8 @@ namespace KBMixer
             currentConfig.Hotkeys = hotkeysToListenFor;
             // Save config to disk
             currentConfig.SaveConfig();
+            UpdateConfigComboItemAtSelectedIndex();
+            UpdateConfigDisplayNamePlaceholder();
         }
 
         private void AddHotkey(int virtualKey)
@@ -330,6 +473,8 @@ namespace KBMixer
 
                 // Append the hotkey to the array of hotkeys to listen for
                 UpdateHotkeysToListenFor();
+                UpdateConfigComboItemAtSelectedIndex();
+                UpdateConfigDisplayNamePlaceholder();
             }
             else
             {
@@ -437,14 +582,9 @@ namespace KBMixer
             // Save the new config to disk
             newConfig.SaveConfig();
 
-            // Update the current config to the new config
-            currentConfig = newConfig;
-
-            // Repopulate the configs in the GUI
-            PopulateConfigs();
-
-            // Select the new config in the combo box
-            comboBoxConfig.SelectedIndex = configs.Length - 1;
+            // Repopulate the configs in the GUI and select the new config
+            PopulateConfigs(configs.Length - 1);
+            LoadConfigToForm();
         }
 
         private void buttonDeleteConfig_Click(object? sender, EventArgs e)
@@ -464,10 +604,10 @@ namespace KBMixer
             configs = configs.Where((source, index) => index != selectedIndex).ToArray();
             // Delete the config from disk
             configToDelete.DeleteConfig();
-            // Repopulate the configs in the GUI
-            PopulateConfigs();
-            // Select the first config in the combo box
-            comboBoxConfig.SelectedIndex = 0;
+            // Repopulate the configs in the GUI (stay near the same position when possible)
+            int nextIndex = Math.Min(selectedIndex, configs.Length - 1);
+            PopulateConfigs(nextIndex);
+            LoadConfigToForm();
         }
         private void RefreshAudioDevicesAndApps()
         {
@@ -487,6 +627,8 @@ namespace KBMixer
             
             // Update process controls to reflect the current state of audio sessions
             PopulateProcessControls();
+            RefreshAllConfigComboItemTexts();
+            UpdateConfigDisplayNamePlaceholder();
         }
         private void buttonRefreshAudio_Click(object sender, EventArgs e)
         {
@@ -555,6 +697,8 @@ namespace KBMixer
 
                     // Save the current config
                     currentConfig.SaveConfig();
+                    UpdateConfigComboItemAtSelectedIndex();
+                    UpdateConfigDisplayNamePlaceholder();
                 }
             }
         }
