@@ -1,0 +1,64 @@
+# Build and publish a Windows release on every push to main.
+# Uses GITHUB_TOKEN (no extra secrets). Release tag: v{csproj-version}-r{run_number}.
+
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Get version from project
+        id: version
+        run: |
+          $lines = dotnet msbuild KBMixer\KBMixer.csproj -getProperty:Version -nologo
+          $v = ($lines | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($v)) { throw "Could not read Version from KBMixer.csproj" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Publish (Release, win-x64)
+        run: >
+          dotnet publish KBMixer\KBMixer.csproj
+          -c Release
+          -o "${{ github.workspace }}\artifacts\publish"
+          --verbosity minimal
+
+      - name: Zip publish output
+        run: |
+          $zip = "${{ github.workspace }}\artifacts\KBMixer-win-x64.zip"
+          Compress-Archive -Path "${{ github.workspace }}\artifacts\publish\*" -DestinationPath $zip -Force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}-r${{ github.run_number }}
+          name: KBMixer v${{ steps.version.outputs.version }} (build ${{ github.run_number }})
+          body: |
+            Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `main`.
+
+            **Download:** `KBMixer-win-x64.zip` — extract and run `KBMixer.exe` (self-contained **win-x64**).
+
+            Bump `<Version>` in `KBMixer/KBMixer.csproj` when you want the release title to reflect a new semantic version; the workflow appends `-r{run_number}` so every push gets a unique tag.
+          files: artifacts/KBMixer-win-x64.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
