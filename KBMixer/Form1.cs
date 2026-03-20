@@ -230,7 +230,7 @@ namespace KBMixer
 
         private void PopulateHotkeys()
         {
-            textboxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(key => ((Keys)key).ToString()));
+            textboxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(KeyDisplayNames.GetDisplayName));
         }
 
         private void PopulateProcessControls()
@@ -323,7 +323,7 @@ namespace KBMixer
                 currentConfig.Hotkeys = currentConfig.Hotkeys.Append(virtualKey).ToArray();
 
                 // Update the textbox text with the array of hotkeys as a string, in "HK1 + HK2 + HK3" format
-                textboxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(key => ((Keys)key).ToString()));
+                textboxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(KeyDisplayNames.GetDisplayName));
 
                 // Save Config to Disk
                 currentConfig.SaveConfig();
