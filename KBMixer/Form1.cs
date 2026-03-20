@@ -1,6 +1,7 @@
 using Linearstar.Windows.RawInput;
 using NAudio.CoreAudioApi;
 using System.Diagnostics;
+using System.Text;
 
 namespace KBMixer
 {
@@ -65,6 +66,8 @@ namespace KBMixer
 
             // Update the array of hotkeys to listen for from all available configs
             UpdateHotkeysToListenFor();
+
+            ShowMissingAudioDevicesWarningIfNeeded();
 
             ApplyResponsiveLayout();
         }
@@ -143,6 +146,40 @@ namespace KBMixer
             if (!string.IsNullOrWhiteSpace(config.CustomDisplayName))
                 return config.CustomDisplayName.Trim();
             return config.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(config));
+        }
+
+        /// <summary>
+        /// One dialog listing every configuration whose saved device ID is not among current endpoints
+        /// (avoids multiple message boxes from per-device loops; see issue #24).
+        /// </summary>
+        private void ShowMissingAudioDevicesWarningIfNeeded()
+        {
+            if (configs is not { Length: > 0 })
+                return;
+
+            var validIds = new HashSet<string>(
+                audioDevices?.Select(d => d.MMDevice.ID) ?? Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            var missing = configs.Where(c => !validIds.Contains(c.DeviceId)).ToList();
+            if (missing.Count == 0)
+                return;
+
+            var message = new StringBuilder();
+            message.AppendLine("Some configurations reference an audio output device that is not available (disconnected, disabled, or removed).");
+            message.AppendLine("Choose a device from the list for each affected configuration, or reconnect the device.");
+            message.AppendLine();
+
+            foreach (var group in missing.GroupBy(c => c.DeviceId))
+            {
+                message.AppendLine("Device ID:");
+                message.AppendLine(group.Key);
+                foreach (var c in group)
+                    message.AppendLine($"  • {GetConfigListDisplayName(c)}");
+                message.AppendLine();
+            }
+
+            MessageBox.Show(message.ToString().TrimEnd(), "Audio device not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         private void PopulateConfigDisplayNameControl()
@@ -342,13 +379,7 @@ namespace KBMixer
 
                 // If the current config's Device selection is currently available
                 if (device.MMDevice.ID == currentConfig.DeviceId)
-                {
-                    selectedIndex = i; // select it
-                }
-                else
-                {
-                    //MessageBox.Show("Audio device from configuration is not available. Please set a desired Audio Output Device.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                    selectedIndex = i;
             }
 
             // Set the selected index to the matched device or default to 0
@@ -633,6 +664,7 @@ namespace KBMixer
         private void buttonRefreshAudio_Click(object sender, EventArgs e)
         {
             RefreshAudioDevicesAndApps();
+            ShowMissingAudioDevicesWarningIfNeeded();
         }
         private void OpenAppSelectionForm(AudioApp[] audioApps, string appFileName)
         {

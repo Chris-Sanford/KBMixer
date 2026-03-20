@@ -1,6 +1,6 @@
 using NAudio.CoreAudioApi;
 using System.Diagnostics;
-using System.Reflection.Metadata;
+using System.IO;
 
 namespace KBMixer
 {
@@ -91,21 +91,19 @@ namespace KBMixer
 
             for (int i = 0; i < sessions.Count; i++)
             {
-                var session = sessions[i];
-                string sessionInstanceIdentifier = session.GetSessionInstanceIdentifier;
-                string appFileName = sessionInstanceIdentifier.Substring(
-                    sessionInstanceIdentifier.LastIndexOf(@"\") + 1,
-                    sessionInstanceIdentifier.IndexOf(@"%b") - sessionInstanceIdentifier.LastIndexOf(@"\") - 1);
-
-                // Eventually update this to get a more friendly name for apps
-                // or at the very least, remove the file extension
-                string appFriendlyName = appFileName;
-
-                if (sessionInstanceIdentifier.EndsWith(systemSoundsId))
+                AudioSessionControl session;
+                try
                 {
-                    appFileName = systemSoundsId;
-                    appFriendlyName = "System Sounds";
+                    session = sessions[i];
                 }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Skipping audio session {i}: {ex.Message}");
+                    continue;
+                }
+
+                if (!TryGetAppIdentity(session, out string appFileName, out string appFriendlyName))
+                    continue;
 
                 var existingApp = audioApps.FirstOrDefault(a => a.AppFileName == appFileName && a.DeviceId == device.ID);
 
@@ -132,6 +130,122 @@ namespace KBMixer
             }
 
             return audioApps.ToArray();
+        }
+
+        /// <summary>
+        /// Resolves the executable key and UI label for a session. The old instance-id substring
+        /// around "%b" breaks for many modern apps (e.g. Chrome); prefer process id and display name.
+        /// </summary>
+        private static bool TryGetAppIdentity(AudioSessionControl session, out string appFileName, out string appFriendlyName)
+        {
+            appFileName = "";
+            appFriendlyName = "";
+
+            try
+            {
+                if (session.IsSystemSoundsSession)
+                {
+                    appFileName = systemSoundsId;
+                    appFriendlyName = "System Sounds";
+                    return true;
+                }
+
+                uint pid = session.GetProcessID;
+                if (pid != 0)
+                {
+                    try
+                    {
+                        using Process proc = Process.GetProcessById((int)pid);
+                        string? exePath = null;
+                        try
+                        {
+                            exePath = proc.MainModule?.FileName;
+                        }
+                        catch
+                        {
+                            // Some sessions are elevated or protected; ProcessName still works for volume routing.
+                        }
+
+                        appFileName = !string.IsNullOrEmpty(exePath)
+                            ? Path.GetFileName(exePath)
+                            : EnsureExeSuffix(proc.ProcessName);
+
+                        if (string.IsNullOrEmpty(appFileName))
+                            return false;
+
+                        string display = session.DisplayName ?? "";
+                        appFriendlyName = !string.IsNullOrWhiteSpace(display)
+                            ? display.Trim()
+                            : Path.GetFileNameWithoutExtension(appFileName);
+                        return true;
+                    }
+                    catch
+                    {
+                        // Process may have exited between enumeration and lookup.
+                    }
+                }
+
+                string displayName = (session.DisplayName ?? "").Trim();
+                if (TryParseExeFromSessionInstanceId(session.GetSessionInstanceIdentifier, out string parsedExe))
+                {
+                    appFileName = parsedExe;
+                    appFriendlyName = !string.IsNullOrEmpty(displayName)
+                        ? displayName
+                        : Path.GetFileNameWithoutExtension(parsedExe);
+                    return true;
+                }
+
+                if (!string.IsNullOrEmpty(displayName))
+                {
+                    appFileName = displayName;
+                    appFriendlyName = displayName;
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"TryGetAppIdentity failed: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private static string EnsureExeSuffix(string processName)
+        {
+            if (string.IsNullOrEmpty(processName))
+                return "";
+            return processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                ? processName
+                : processName + ".exe";
+        }
+
+        /// <summary>
+        /// Pulls the .exe segment from a session instance id without relying on a "%b" marker
+        /// (format varies by OS build and app packaging).
+        /// </summary>
+        private static bool TryParseExeFromSessionInstanceId(string? instanceId, out string exeName)
+        {
+            exeName = "";
+            if (string.IsNullOrEmpty(instanceId))
+                return false;
+
+            int exeIdx = instanceId.LastIndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+            if (exeIdx < 0)
+                return false;
+
+            int segmentEnd = exeIdx + 4;
+            int start = instanceId.LastIndexOf('\\', exeIdx);
+            if (start < 0)
+                start = instanceId.LastIndexOf('/', exeIdx);
+            if (start < 0)
+                start = instanceId.LastIndexOf('|', exeIdx);
+            start++;
+
+            if (start >= segmentEnd || start < 0)
+                return false;
+
+            exeName = instanceId.Substring(start, segmentEnd - start);
+            return exeName.Length > 0;
         }
 
         public static AudioSessionControl GetAudioSessionControls(MMDevice device)
