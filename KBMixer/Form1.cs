@@ -55,6 +55,7 @@ namespace KBMixer
         public Form1(bool startMinimized = false)
         {
             InitializeComponent();
+            AppIconHelper.ApplyApplicationIcon(this, trayIcon);
 
             this.Resize += new EventHandler(MainForm_Resize);
             trayIcon.Click += new EventHandler(TrayIcon_Click);

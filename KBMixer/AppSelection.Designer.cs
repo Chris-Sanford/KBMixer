@@ -1,4 +1,4 @@
-﻿namespace KBMixer
+namespace KBMixer
 {
     partial class AppSelection
     {
@@ -26,7 +26,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(AppSelection));
             radioSelect = new RadioButton();
             radioEnter = new RadioButton();
             comboBoxSelect = new ComboBox();
@@ -106,7 +105,7 @@
             Controls.Add(comboBoxSelect);
             Controls.Add(radioEnter);
             Controls.Add(radioSelect);
-            Icon = (Icon)resources.GetObject("$this.Icon");
+            Icon = null;
             Name = "AppSelection";
             Text = "Select an Application";
             ResumeLayout(false);

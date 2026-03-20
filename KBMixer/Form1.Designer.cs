@@ -315,7 +315,7 @@ namespace KBMixer
             // 
             // trayIcon
             // 
-            trayIcon.Icon = (Icon)resources.GetObject("trayIcon.Icon");
+            trayIcon.Icon = null;
             trayIcon.Text = "KBMixer";
             trayIcon.Visible = true;
             // 
@@ -348,7 +348,7 @@ namespace KBMixer
             Controls.Add(appLabel);
             Controls.Add(deviceLabel);
             Controls.Add(deviceComboBox);
-            Icon = (Icon)resources.GetObject("$this.Icon");
+            Icon = null;
             Name = "Form1";
             Text = "KBMixer";
             groupBoxHowTo.ResumeLayout(false);

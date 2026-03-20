@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -20,6 +20,7 @@ namespace KBMixer
         public AppSelection(AudioApp[] audioApps, string appFileName)
         {
             InitializeComponent();
+            AppIconHelper.ApplyApplicationIcon(this);
             SetAppSelection(appFileName);
             PopulateActiveAppsSelection(audioApps);
         }
