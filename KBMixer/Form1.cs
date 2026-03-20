@@ -22,6 +22,9 @@ namespace KBMixer
         public int[] hotkeysHeld = Array.Empty<int>(); // Array of Hotkeys that are currently being held down
         public bool listeningForHotkeyAdd = false;
 
+        /// <summary>Avoids <see cref="comboBoxAudioSession"/> <c>SelectedIndexChanged</c> while we sync from audio state.</summary>
+        private bool suspendSessionPickerEvents;
+
         private const int LayoutFieldLeft = 56;
         private const int LayoutMarginRight = 12;
         private const int LayoutFieldToButtonGap = 8;
@@ -101,6 +104,10 @@ namespace KBMixer
             textBoxAppSelected.Width = fieldWidth;
             textboxHotkeys.Width = fieldWidth;
 
+            int sessionPickLeft = labelProcessIndex.Right + 6;
+            comboBoxAudioSession.Left = sessionPickLeft;
+            comboBoxAudioSession.Width = Math.Max(120, singleLeft - LayoutFieldToButtonGap - sessionPickLeft);
+
             labelInstructions.Left = LayoutFieldLeft;
             labelInstructions.Width = Math.Max(200, cw - LayoutFieldLeft - LayoutMarginRight);
 
@@ -146,6 +153,78 @@ namespace KBMixer
             if (!string.IsNullOrWhiteSpace(config.CustomDisplayName))
                 return config.CustomDisplayName.Trim();
             return config.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(config));
+        }
+
+        /// <summary>
+        /// All sessions for this app across ALL output devices, sorted by PID then session id.
+        /// Windows pairs endpoints (e.g. "Hyper-X Game" + "Headset Earphone Chat") so an app like
+        /// Discord shows two mixer entries that appear to be on the same device but are actually on
+        /// separate WASAPI endpoints. This collects them all so "control all" adjusts every instance
+        /// and the session picker can list every selectable target.
+        /// </summary>
+        private List<(AudioSessionControl session, string deviceName)> CollectAllMatchingSessionsAcrossDevices(Config config)
+        {
+            var result = new List<(AudioSessionControl, string)>();
+            if (audioDevices == null)
+                return result;
+
+            foreach (var ad in audioDevices)
+            {
+                var sessions = Audio.CollectSessionsForConfig(ad.MMDevice, config);
+                foreach (var s in sessions)
+                    result.Add((s, ad.MMDevice.FriendlyName));
+            }
+
+            result.Sort((a, b) =>
+            {
+                int c = a.Item1.GetProcessID.CompareTo(b.Item1.GetProcessID);
+                return c != 0 ? c : string.CompareOrdinal(
+                    a.Item1.GetSessionInstanceIdentifier ?? "",
+                    b.Item1.GetSessionInstanceIdentifier ?? "");
+            });
+            return result;
+        }
+
+        private static string FormatSessionPickLine(int index, AudioSessionControl s, string deviceName)
+        {
+            uint pid = s.GetProcessID;
+            string devShort = deviceName.Length > 20 ? deviceName[..20] + "…" : deviceName;
+            return $"#{index} — PID {pid} — {devShort}";
+        }
+
+        private void RefreshSessionPickerFromAudio()
+        {
+            var entries = CollectAllMatchingSessionsAcrossDevices(currentConfig);
+            suspendSessionPickerEvents = true;
+            try
+            {
+                comboBoxAudioSession.Items.Clear();
+                if (entries.Count == 0)
+                {
+                    comboBoxAudioSession.Enabled = false;
+                    if (currentConfig.ControlSingleSession)
+                        currentConfig.ProcessIndex = 0;
+                    return;
+                }
+
+                int maxIndex = entries.Count - 1;
+                int clamped = Math.Clamp(currentConfig.ProcessIndex, 0, maxIndex);
+                if (clamped != currentConfig.ProcessIndex)
+                {
+                    currentConfig.ProcessIndex = clamped;
+                    currentConfig.SaveConfig();
+                }
+
+                for (int i = 0; i < entries.Count; i++)
+                    comboBoxAudioSession.Items.Add(FormatSessionPickLine(i, entries[i].session, entries[i].deviceName));
+
+                comboBoxAudioSession.SelectedIndex = clamped;
+                comboBoxAudioSession.Enabled = currentConfig.ControlSingleSession;
+            }
+            finally
+            {
+                suspendSessionPickerEvents = false;
+            }
         }
 
         /// <summary>
@@ -319,22 +398,27 @@ namespace KBMixer
                             .Where(config => config.Hotkeys.SequenceEqual(hotkeysHeld))
                             .ToArray();
 
-                        // Create the array of AudioApps that match the app file names
-                        var matchingAudioApps = audioApps
-                            ?.Where(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && matchingConfigs.Any(config => config.AppFileName == app.AppFileName))
-                            .ToArray() ?? Array.Empty<AudioApp>();
-
-                        // Adjust the volume of the audio apps (or the specified session) based on scroll direction
-                        foreach (var app in matchingAudioApps)
+                        foreach (var config in matchingConfigs)
                         {
-                            var config = matchingConfigs.FirstOrDefault(c => c.AppFileName == app.AppFileName);
-                            if (config != null && config.ControlSingleSession)
+                            bool isUp = mouseData.Mouse.ButtonData == mouseWheelUp;
+                            var entries = CollectAllMatchingSessionsAcrossDevices(config);
+                            if (entries.Count == 0)
+                                continue;
+
+                            if (config.ControlSingleSession)
                             {
-                                app.AdjustVolume(mouseData.Mouse.ButtonData == mouseWheelUp, config.ProcessIndex);
+                                var sessions = entries.Select(e => e.session).ToList();
+                                Audio.AdjustSessionsVolume(sessions, isUp, config.ProcessIndex);
                             }
                             else
                             {
-                                app.AdjustVolume(mouseData.Mouse.ButtonData == mouseWheelUp);
+                                foreach (var (session, _) in entries)
+                                {
+                                    if (isUp)
+                                        session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + AudioApp.volumeIncrement);
+                                    else
+                                        session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - AudioApp.volumeIncrement);
+                                }
                             }
                         }
                     }
@@ -399,40 +483,7 @@ namespace KBMixer
         private void PopulateProcessControls()
         {
             checkBoxControlSingleAppProcess.Checked = currentConfig.ControlSingleSession;
-            
-            // Get the selected app to determine the valid range for process index
-            var selectedApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName == currentConfig.AppFileName);
-            if (selectedApp != null && selectedApp.Sessions.Count > 0)
-            {
-                int maxIndex = selectedApp.Sessions.Count - 1;
-                processIndexSelector.Minimum = 0;
-                processIndexSelector.Maximum = maxIndex;
-                
-                // Ensure the current value is within valid range
-                if (currentConfig.ProcessIndex > maxIndex)
-                {
-                    currentConfig.ProcessIndex = maxIndex;
-                    processIndexSelector.Value = maxIndex;
-                }
-                else
-                {
-                    processIndexSelector.Value = currentConfig.ProcessIndex;
-                }
-                
-                processIndexSelector.Enabled = currentConfig.ControlSingleSession;
-            }
-            else
-            {
-                // No sessions available, disable the control
-                processIndexSelector.Value = 0;
-                processIndexSelector.Enabled = false;
-                
-                // If control single session is enabled but there are no sessions, update the config
-                if (currentConfig.ControlSingleSession)
-                {
-                    currentConfig.ProcessIndex = 0;
-                }
-            }
+            RefreshSessionPickerFromAudio();
         }
 
         private void comboBoxConfig_SelectedIndexChanged(object sender, EventArgs e)
@@ -453,6 +504,7 @@ namespace KBMixer
             // Update current config with the selected device
             currentConfig.DeviceId = audioDevices[deviceComboBox.SelectedIndex].MMDevice.ID;
             currentConfig.SaveConfig();
+            RefreshSessionPickerFromAudio();
             UpdateConfigComboItemAtSelectedIndex();
             UpdateConfigDisplayNamePlaceholder();
         }
@@ -518,74 +570,24 @@ namespace KBMixer
         private void checkBoxControlSingleAppProcess_CheckedChanged(object? sender, EventArgs e)
         {
             currentConfig.ControlSingleSession = checkBoxControlSingleAppProcess.Checked;
-            if (currentConfig.ControlSingleSession)
-            {
-                // Get the selected app to determine the valid range for process index
-                var selectedApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName == currentConfig.AppFileName);
-                if (selectedApp != null && selectedApp.Sessions.Count > 0)
-                {
-                    int maxIndex = selectedApp.Sessions.Count - 1;
-                    processIndexSelector.Minimum = 0;
-                    processIndexSelector.Maximum = maxIndex;
-                    
-                    // Ensure the current value is within valid range
-                    if (currentConfig.ProcessIndex > maxIndex)
-                    {
-                        currentConfig.ProcessIndex = maxIndex;
-                        processIndexSelector.Value = maxIndex;
-                    }
-                    else
-                    {
-                        processIndexSelector.Value = currentConfig.ProcessIndex;
-                    }
-                    
-                    processIndexSelector.Enabled = true;
-                }
-                else
-                {
-                    // No sessions available, disable the control
-                    processIndexSelector.Value = 0;
-                    processIndexSelector.Enabled = false;
-                    currentConfig.ProcessIndex = 0;
-                }
-            }
-            else
-            {
-                processIndexSelector.Enabled = false;
-            }
+            RefreshSessionPickerFromAudio();
             currentConfig.SaveConfig();
         }
 
-        private void processIndexSelector_ValueChanged(object sender, EventArgs e)
+        private void comboBoxAudioSession_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            var selectedApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName == currentConfig.AppFileName);
-            if (selectedApp != null)
-            {
-                int maxIndex = selectedApp.Sessions.Count - 1;
-                if (maxIndex < 0)
-                {
-                    // No sessions available
-                    processIndexSelector.Enabled = false;
-                    processIndexSelector.Value = 0;
-                    currentConfig.ProcessIndex = 0;
-                }
-                else
-                {
-                    // Set the minimum and maximum values for the NumericUpDown control
-                    processIndexSelector.Minimum = 0;
-                    processIndexSelector.Maximum = maxIndex;
-                    
-                    // Ensure the value is within valid range
-                    if (processIndexSelector.Value > maxIndex)
-                    {
-                        processIndexSelector.Value = maxIndex;
-                    }
-                    
-                    // Update the config with the new process index
-                    currentConfig.ProcessIndex = (int)processIndexSelector.Value;
-                    currentConfig.SaveConfig();
-                }
-            }
+            if (suspendSessionPickerEvents)
+                return;
+            if (comboBoxAudioSession.SelectedIndex < 0)
+                return;
+
+            var entries = CollectAllMatchingSessionsAcrossDevices(currentConfig);
+            if (entries.Count == 0)
+                return;
+
+            int idx = Math.Clamp(comboBoxAudioSession.SelectedIndex, 0, entries.Count - 1);
+            currentConfig.ProcessIndex = idx;
+            currentConfig.SaveConfig();
         }
 
         private void buttonSaveConfig_Click(object? sender, EventArgs e)
@@ -682,8 +684,11 @@ namespace KBMixer
                         return;
                     }
 
-                    // Try to find the corresponding AudioApp by friendly name first
-                    var matchingApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFriendlyName) && app.AppFriendlyName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
+                    // Prefer the app row for the config's output device when the same title exists on multiple endpoints
+                    var matchingApp = audioApps?
+                        .Where(app => app != null && string.Equals(app.DeviceId, currentConfig.DeviceId, StringComparison.OrdinalIgnoreCase))
+                        .FirstOrDefault(app => !string.IsNullOrWhiteSpace(app!.AppFriendlyName) && app.AppFriendlyName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
+                    matchingApp ??= audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFriendlyName) && app.AppFriendlyName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
                     
                     string selectedAppFileName;
                     string actualFriendlyName;
@@ -697,8 +702,11 @@ namespace KBMixer
                     else
                     {
                         // Not found by friendly name - user probably entered a filename manually
-                        // Try to find by filename
-                        matchingApp = audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
+                        // Try to find by filename (device first)
+                        matchingApp = audioApps?
+                            .Where(app => app != null && string.Equals(app.DeviceId, currentConfig.DeviceId, StringComparison.OrdinalIgnoreCase))
+                            .FirstOrDefault(app => !string.IsNullOrWhiteSpace(app!.AppFileName) && app.AppFileName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
+                        matchingApp ??= audioApps?.FirstOrDefault(app => app != null && !string.IsNullOrWhiteSpace(app.AppFileName) && app.AppFileName.Equals(selectedAppFriendlyName, StringComparison.OrdinalIgnoreCase));
                         
                         if (matchingApp != null)
                         {

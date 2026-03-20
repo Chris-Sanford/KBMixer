@@ -34,7 +34,7 @@ namespace KBMixer
             deviceLabel = new Label();
             appLabel = new Label();
             checkBoxControlSingleAppProcess = new CheckBox();
-            processIndexSelector = new NumericUpDown();
+            comboBoxAudioSession = new ComboBox();
             labelProcessIndex = new Label();
             labelConfig = new Label();
             labelConfigDisplayName = new Label();
@@ -53,7 +53,6 @@ namespace KBMixer
             buttonAppSet = new Button();
             labelInstructions = new Label();
             trayIcon = new NotifyIcon(components);
-            ((System.ComponentModel.ISupportInitialize)processIndexSelector).BeginInit();
             SuspendLayout();
             // 
             // deviceComboBox
@@ -97,24 +96,28 @@ namespace KBMixer
             checkBoxControlSingleAppProcess.UseVisualStyleBackColor = true;
             checkBoxControlSingleAppProcess.CheckedChanged += checkBoxControlSingleAppProcess_CheckedChanged;
             // 
-            // processIndexSelector
+            // comboBoxAudioSession
             // 
-            processIndexSelector.Enabled = false;
-            processIndexSelector.Location = new Point(342, 162);
-            processIndexSelector.Name = "processIndexSelector";
-            processIndexSelector.Size = new Size(35, 23);
-            processIndexSelector.TabIndex = 9;
-            processIndexSelector.TextAlign = HorizontalAlignment.Center;
-            processIndexSelector.ValueChanged += processIndexSelector_ValueChanged;
+            comboBoxAudioSession.AccessibleDescription = "Pick which audio session to control when using single-session mode";
+            comboBoxAudioSession.AccessibleName = "Audio session";
+            comboBoxAudioSession.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboBoxAudioSession.Enabled = false;
+            comboBoxAudioSession.FormattingEnabled = true;
+            comboBoxAudioSession.IntegralHeight = false;
+            comboBoxAudioSession.Location = new Point(342, 162);
+            comboBoxAudioSession.Name = "comboBoxAudioSession";
+            comboBoxAudioSession.Size = new Size(220, 23);
+            comboBoxAudioSession.TabIndex = 9;
+            comboBoxAudioSession.SelectedIndexChanged += comboBoxAudioSession_SelectedIndexChanged;
             // 
             // labelProcessIndex
             // 
             labelProcessIndex.AutoSize = true;
             labelProcessIndex.Location = new Point(255, 164);
             labelProcessIndex.Name = "labelProcessIndex";
-            labelProcessIndex.Size = new Size(81, 15);
+            labelProcessIndex.Size = new Size(52, 15);
             labelProcessIndex.TabIndex = 10;
-            labelProcessIndex.Text = "Process Index:";
+            labelProcessIndex.Text = "Session:";
             // 
             // labelConfig
             // 
@@ -306,7 +309,7 @@ namespace KBMixer
             Controls.Add(labelConfig);
             Controls.Add(comboBoxConfig);
             Controls.Add(labelProcessIndex);
-            Controls.Add(processIndexSelector);
+            Controls.Add(comboBoxAudioSession);
             Controls.Add(checkBoxControlSingleAppProcess);
             Controls.Add(appLabel);
             Controls.Add(deviceLabel);
@@ -314,7 +317,6 @@ namespace KBMixer
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Form1";
             Text = "KBMixer";
-            ((System.ComponentModel.ISupportInitialize)processIndexSelector).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -325,7 +327,7 @@ namespace KBMixer
         private Label deviceLabel;
         private Label appLabel;
         private CheckBox checkBoxControlSingleAppProcess;
-        private NumericUpDown processIndexSelector;
+        private ComboBox comboBoxAudioSession;
         private Label labelProcessIndex;
         private Label labelConfig;
         private Label labelConfigDisplayName;

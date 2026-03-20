@@ -1,6 +1,10 @@
 using NAudio.CoreAudioApi;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace KBMixer
 {
@@ -29,36 +33,8 @@ namespace KBMixer
         public required string AppFileName { get; set; } // For Audio Control Logic
         public required List<AudioSessionControl> Sessions { get; set; } // Collection of Sessions for this App
 
-        public void AdjustVolume(bool isUp, int? processIndex = null)
-        {
-            // Adjust Volume of Specific Process
-            if (processIndex.HasValue && processIndex.Value >= 0 && processIndex.Value < Sessions.Count)
-            {
-                var session = Sessions[processIndex.Value];
-                if (isUp)
-                {
-                    session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + volumeIncrement);
-                }
-                else
-                {
-                    session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - volumeIncrement);
-                }
-            }
-            else // Adjust Volume of All Processes for the Specified App
-            {
-                foreach (var session in Sessions)
-                {
-                    if (isUp)
-                    {
-                        session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + volumeIncrement);
-                    }
-                    else
-                    {
-                        session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - volumeIncrement);
-                    }
-                }
-            }
-        }
+        public void AdjustVolume(bool isUp, int? processIndex = null) =>
+            Audio.AdjustSessionsVolume(Sessions, isUp, processIndex);
     }
 
     // Class that contains methods to interact with the audio sessions
@@ -66,6 +42,184 @@ namespace KBMixer
     public static class Audio 
     {
         public const string systemSoundsId = "%b#";
+
+        private static readonly Regex InstanceSuffix = new(@"\s*\(\s*Instance\s+\d+\s*\)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
+
+        private sealed class SessionReferenceEqualityComparer : IEqualityComparer<AudioSessionControl>
+        {
+            public static readonly SessionReferenceEqualityComparer Instance = new();
+            public bool Equals(AudioSessionControl? x, AudioSessionControl? y) => ReferenceEquals(x, y);
+            public int GetHashCode(AudioSessionControl obj) => RuntimeHelpers.GetHashCode(obj);
+        }
+
+        /// <summary>Adjust one session by index, or all sessions when <paramref name="processIndex"/> is null or out of range.</summary>
+        public static void AdjustSessionsVolume(IReadOnlyList<AudioSessionControl> sessions, bool isUp, int? processIndex = null)
+        {
+            if (sessions == null || sessions.Count == 0)
+                return;
+
+            if (processIndex.HasValue && processIndex.Value >= 0 && processIndex.Value < sessions.Count)
+            {
+                var session = sessions[processIndex.Value];
+                if (isUp)
+                    session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + AudioApp.volumeIncrement);
+                else
+                    session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - AudioApp.volumeIncrement);
+                return;
+            }
+
+            foreach (var session in sessions)
+            {
+                if (isUp)
+                    session.SimpleAudioVolume.Volume = Math.Min(1.0f, session.SimpleAudioVolume.Volume + AudioApp.volumeIncrement);
+                else
+                    session.SimpleAudioVolume.Volume = Math.Max(0.0f, session.SimpleAudioVolume.Volume - AudioApp.volumeIncrement);
+            }
+        }
+
+        /// <summary>Grouping key for matching config <c>AppFileName</c> to enumerated apps (strips Windows " (Instance N)" labels).</summary>
+        public static string GroupingKeyForAppFileName(string? appFileName) => NormalizeAppFileKey(appFileName);
+
+        /// <summary>
+        /// Reads sessions straight from the device session manager (same source as the Windows volume mixer).
+        /// Used for process-index bounds and single-session volume so we never miss sessions due to <see cref="AudioApp"/> merge quirks.
+        /// </summary>
+        public static List<AudioSessionControl> CollectSessionsForExecutableGroup(MMDevice device, string configAppFileName)
+        {
+            string targetKey = GroupingKeyForAppFileName(configAppFileName);
+            var list = new List<AudioSessionControl>();
+            var seen = new HashSet<AudioSessionControl>(SessionReferenceEqualityComparer.Instance);
+
+            SessionCollection sessions = device.AudioSessionManager.Sessions;
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                AudioSessionControl session;
+                try
+                {
+                    session = sessions[i];
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"CollectSessionsForExecutableGroup: skip index {i}: {ex.Message}");
+                    continue;
+                }
+
+                if (!TryGetAppIdentity(session, out string appFileName, out _))
+                    continue;
+                if (GroupingKeyForAppFileName(appFileName) != targetKey)
+                    continue;
+                if (seen.Add(session))
+                    list.Add(session);
+            }
+
+            list.Sort(static (a, b) =>
+            {
+                int c = a.GetProcessID.CompareTo(b.GetProcessID);
+                return c != 0 ? c : string.CompareOrdinal(a.GetSessionInstanceIdentifier ?? "", b.GetSessionInstanceIdentifier ?? "");
+            });
+            return list;
+        }
+
+        /// <summary>
+        /// Whether a WASAPI session belongs to the app described by the config. Uses executable grouping first, then
+        /// display/friendly substring matching so configs that only store "Discord" (or a mixer title like "Discord (Instance 2)")
+        /// still collect every related session even when different sessions resolve to different internal exe strings.
+        /// </summary>
+        public static bool SessionMatchesConfig(string sessionExeIdentity, string? sessionDisplayName, string? sessionFriendlyNameFromIdentity, string configAppFileName, string? configAppFriendlyName)
+        {
+            string targetKey = GroupingKeyForAppFileName(configAppFileName);
+            string exeKey = GroupingKeyForAppFileName(sessionExeIdentity);
+            if (exeKey == targetKey)
+                return true;
+
+            string disp = (sessionDisplayName ?? "").Trim();
+            if (string.IsNullOrEmpty(disp))
+                disp = (sessionFriendlyNameFromIdentity ?? "").Trim();
+
+            string needle = (configAppFriendlyName ?? "").Trim();
+            if (needle.Length >= 2 && disp.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            string cfgBase = Path.GetFileNameWithoutExtension(configAppFileName.Trim());
+            if (cfgBase.Length >= 3 && disp.Contains(cfgBase, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>Sessions on <paramref name="device"/> that match <paramref name="config"/> (device id + app identity).</summary>
+        public static List<AudioSessionControl> CollectSessionsForConfig(MMDevice device, Config config)
+        {
+            var list = new List<AudioSessionControl>();
+            var seen = new HashSet<AudioSessionControl>(SessionReferenceEqualityComparer.Instance);
+            SessionCollection sessions = device.AudioSessionManager.Sessions;
+
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                AudioSessionControl session;
+                try
+                {
+                    session = sessions[i];
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"CollectSessionsForConfig: skip index {i}: {ex.Message}");
+                    continue;
+                }
+
+                if (!TryGetAppIdentity(session, out string appFileName, out string appFriendlyName))
+                    continue;
+
+                string disp = (session.DisplayName ?? "").Trim();
+                if (!SessionMatchesConfig(appFileName, disp, appFriendlyName, config.AppFileName, config.AppFriendlyName))
+                    continue;
+
+                if (seen.Add(session))
+                    list.Add(session);
+            }
+
+            list.Sort(static (a, b) =>
+            {
+                int c = a.GetProcessID.CompareTo(b.GetProcessID);
+                return c != 0 ? c : string.CompareOrdinal(a.GetSessionInstanceIdentifier ?? "", b.GetSessionInstanceIdentifier ?? "");
+            });
+            return list;
+        }
+
+        /// <summary>Writes every render session on every active device (for debugging / validation).</summary>
+        public static string WriteSessionDiagnosticFile()
+        {
+            var sb = new StringBuilder();
+            MMDeviceEnumerator enumerator = new MMDeviceEnumerator();
+            MMDeviceCollection devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+            int d = 0;
+            foreach (MMDevice dev in devices)
+            {
+                sb.AppendLine($"=== [{d++}] {dev.FriendlyName}");
+                sb.AppendLine($"    ID: {dev.ID}");
+                SessionCollection coll = dev.AudioSessionManager.Sessions;
+                for (int i = 0; i < coll.Count; i++)
+                {
+                    try
+                    {
+                        AudioSessionControl s = coll[i];
+                        TryGetAppIdentity(s, out string exeId, out string fr);
+                        string key = GroupingKeyForAppFileName(exeId);
+                        sb.AppendLine($"  [{i}] PID={s.GetProcessID} Display=\"{s.DisplayName}\"");
+                        sb.AppendLine($"        exeId={exeId}  groupingKey={key}  identityFriendly={fr}");
+                    }
+                    catch (Exception ex)
+                    {
+                        sb.AppendLine($"  [{i}] <error: {ex.Message}>");
+                    }
+                }
+                sb.AppendLine();
+            }
+
+            string path = Path.Combine(Path.GetTempPath(), "KBMixer-audio-sessions.txt");
+            File.WriteAllText(path, sb.ToString());
+            return path;
+        }
 
         public static AudioDevice[] GetAudioDevices()
         {
@@ -105,11 +259,21 @@ namespace KBMixer
                 if (!TryGetAppIdentity(session, out string appFileName, out string appFriendlyName))
                     continue;
 
-                var existingApp = audioApps.FirstOrDefault(a => a.AppFileName == appFileName && a.DeviceId == device.ID);
+                // Same executable often appears under slightly different keys (e.g. "Discord" vs "Discord.exe",
+                // casing). Merge into one AudioApp per device so session indices match the volume mixer and
+                // we do not run AdjustVolume once per duplicate row.
+                string mergeKey = NormalizeAppFileKey(appFileName);
+                var existingApp = audioApps.FirstOrDefault(a =>
+                    a.DeviceId == device.ID && NormalizeAppFileKey(a.AppFileName) == mergeKey);
 
                 if (existingApp != null)
                 {
                     existingApp.Sessions.Add(session);
+                    if (!existingApp.AppFileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+                        appFileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        existingApp.AppFileName = appFileName;
+                    }
                 }
                 else
                 {
@@ -133,9 +297,22 @@ namespace KBMixer
         }
 
         /// <summary>
-        /// Resolves the executable key and UI label for a session. The old instance-id substring
-        /// around "%b" breaks for many modern apps (e.g. Chrome); prefer process id and display name.
+        /// Stable key for grouping sessions on a device. Strips trailing <c> (Instance N)</c> from display-derived
+        /// names so Windows' duplicate labels (e.g. Discord) merge with <c>Discord.exe</c> from the process path.
         /// </summary>
+        private static string NormalizeAppFileKey(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return "";
+            string t = name.Trim();
+            if (string.Equals(t, systemSoundsId, StringComparison.Ordinal))
+                return t.ToLowerInvariant();
+            t = InstanceSuffix.Replace(t, "").Trim();
+            if (!t.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                t += ".exe";
+            return t.ToLowerInvariant();
+        }
+
         private static bool TryGetAppIdentity(AudioSessionControl session, out string appFileName, out string appFriendlyName)
         {
             appFileName = "";
