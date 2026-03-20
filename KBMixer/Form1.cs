@@ -25,6 +25,9 @@ namespace KBMixer
         /// <summary>Avoids <see cref="comboBoxAudioSession"/> <c>SelectedIndexChanged</c> while we sync from audio state.</summary>
         private bool suspendSessionPickerEvents;
 
+        /// <summary>Avoids <see cref="checkBoxOpenAtStartup"/> <c>CheckedChanged</c> while we sync from the registry.</summary>
+        private bool suspendOpenAtStartupEvents;
+
         /// <summary>
         /// Cached session lists per config id, built at startup / refresh / hotkey-down.
         /// Used by <see cref="WndProc"/> so scroll events never re-enumerate WASAPI.
@@ -37,6 +40,14 @@ namespace KBMixer
         private const int LayoutTwinButtonWidth = 64;
         private const int LayoutTwinButtonGap = 6;
         private const int LayoutActionStripWidth = LayoutTwinButtonWidth + LayoutTwinButtonGap + LayoutTwinButtonWidth;
+
+        private const int LayoutUsageMarginX = 8;
+        private const int LayoutAfterSessionGap = 14;
+        private const int LayoutUsageLabelTop = 22;
+        private const int LayoutUsageGroupBottomPad = 14;
+        private const int LayoutAfterUsageGroupGap = 14;
+        private const int LayoutUsageLabelPadH = 12;
+        private const int LayoutBottomMargin = 12;
 
         public Form1(bool startMinimized = false)
         {
@@ -82,6 +93,16 @@ namespace KBMixer
 
             ApplyResponsiveLayout();
 
+            suspendOpenAtStartupEvents = true;
+            try
+            {
+                checkBoxOpenAtStartup.Checked = StartupRegistration.IsRegisteredForCurrentExe();
+            }
+            finally
+            {
+                suspendOpenAtStartupEvents = false;
+            }
+
             if (startMinimized)
                 WindowState = FormWindowState.Minimized;
         }
@@ -115,14 +136,49 @@ namespace KBMixer
             textBoxAppSelected.Width = fieldWidth;
             textboxHotkeys.Width = fieldWidth;
 
-            int sessionPickLeft = labelProcessIndex.Right + 6;
+            int sessionPickLeft = checkBoxControlSingleAppProcess.Right + LayoutFieldToButtonGap;
             comboBoxAudioSession.Left = sessionPickLeft;
+            comboBoxAudioSession.Top = checkBoxControlSingleAppProcess.Top
+                + (checkBoxControlSingleAppProcess.Height - comboBoxAudioSession.Height) / 2;
             comboBoxAudioSession.Width = Math.Max(120, singleLeft - LayoutFieldToButtonGap - sessionPickLeft);
+            labelSession.Top = checkBoxControlSingleAppProcess.Top
+                + (checkBoxControlSingleAppProcess.Height - labelSession.Height) / 2;
 
-            labelInstructions.Left = LayoutFieldLeft;
-            labelInstructions.Width = Math.Max(200, cw - LayoutFieldLeft - LayoutMarginRight);
+            int sessionBottom = Math.Max(checkBoxControlSingleAppProcess.Bottom, comboBoxAudioSession.Bottom);
+
+            groupBoxHowTo.Left = LayoutUsageMarginX;
+            groupBoxHowTo.Top = sessionBottom + LayoutAfterSessionGap;
+            groupBoxHowTo.Width = Math.Max(200, cw - 2 * LayoutUsageMarginX);
+
+            int innerW = Math.Max(80, groupBoxHowTo.ClientSize.Width - 2 * LayoutUsageLabelPadH);
+            int textH = MeasureWrappedInstructionHeight(labelInstructions.Text, labelInstructions.Font, innerW);
+            labelInstructions.Left = LayoutUsageLabelPadH;
+            labelInstructions.Top = LayoutUsageLabelTop;
+            labelInstructions.Width = innerW;
+            labelInstructions.Height = Math.Max(textH + 4, 36);
+
+            groupBoxHowTo.Height = LayoutUsageLabelTop + labelInstructions.Height + LayoutUsageGroupBottomPad;
+
+            checkBoxOpenAtStartup.Left = LayoutFieldLeft;
+            checkBoxOpenAtStartup.Top = groupBoxHowTo.Bottom + LayoutAfterUsageGroupGap;
+
+            int minClientH = checkBoxOpenAtStartup.Bottom + LayoutBottomMargin;
+            int chrome = Height - ClientSize.Height;
+            if (chrome < 1)
+                chrome = 39;
+            int minOuterH = minClientH + chrome;
+            if (minOuterH > MinimumSize.Height)
+                MinimumSize = new Size(Math.Max(MinimumSize.Width, 520), minOuterH);
 
             SyncConfigComboDropDownWidth();
+        }
+
+        private static int MeasureWrappedInstructionHeight(string? text, Font font, int maxWidth)
+        {
+            if (string.IsNullOrEmpty(text))
+                return 0;
+            const TextFormatFlags flags = TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl | TextFormatFlags.NoPrefix;
+            return TextRenderer.MeasureText(text, font, new Size(maxWidth, int.MaxValue), flags).Height;
         }
 
         void MainForm_Resize(object? sender, EventArgs e)
@@ -766,6 +822,35 @@ namespace KBMixer
         private void buttonAppSet_Click(object? sender, EventArgs e)
         {
             OpenAppSelectionForm(audioApps, currentConfig.AppFileName);
+        }
+
+        private void checkBoxOpenAtStartup_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (suspendOpenAtStartupEvents)
+                return;
+
+            try
+            {
+                StartupRegistration.SetRegistered(checkBoxOpenAtStartup.Checked);
+            }
+            catch (Exception ex)
+            {
+                suspendOpenAtStartupEvents = true;
+                try
+                {
+                    checkBoxOpenAtStartup.Checked = !checkBoxOpenAtStartup.Checked;
+                }
+                finally
+                {
+                    suspendOpenAtStartupEvents = false;
+                }
+
+                MessageBox.Show(
+                    $"Could not update the Windows startup setting.\n\n{ex.Message}",
+                    "KBMixer",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
         }
     }
 }

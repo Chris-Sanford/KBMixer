@@ -35,7 +35,7 @@ namespace KBMixer
             appLabel = new Label();
             checkBoxControlSingleAppProcess = new CheckBox();
             comboBoxAudioSession = new ComboBox();
-            labelProcessIndex = new Label();
+            labelSession = new Label();
             labelConfig = new Label();
             labelConfigDisplayName = new Label();
             textBoxConfigDisplayName = new TextBox();
@@ -45,14 +45,16 @@ namespace KBMixer
             textboxHotkeys = new TextBox();
             buttonHotkeyAdd = new Button();
             buttonHotkeyReset = new Button();
-            labelControlSingleAppProcess = new Label();
             buttonNewConfig = new Button();
             buttonRefreshAudio = new Button();
             buttonDeleteConfig = new Button();
             textBoxAppSelected = new TextBox();
             buttonAppSet = new Button();
+            groupBoxHowTo = new GroupBox();
             labelInstructions = new Label();
+            checkBoxOpenAtStartup = new CheckBox();
             trayIcon = new NotifyIcon(components);
+            groupBoxHowTo.SuspendLayout();
             SuspendLayout();
             // 
             // deviceComboBox
@@ -88,11 +90,13 @@ namespace KBMixer
             // 
             // checkBoxControlSingleAppProcess
             // 
+            checkBoxControlSingleAppProcess.AccessibleDescription = "When checked, volume changes apply only to the audio session selected in the list";
             checkBoxControlSingleAppProcess.AutoSize = true;
-            checkBoxControlSingleAppProcess.Location = new Point(229, 165);
+            checkBoxControlSingleAppProcess.Location = new Point(56, 151);
             checkBoxControlSingleAppProcess.Name = "checkBoxControlSingleAppProcess";
-            checkBoxControlSingleAppProcess.Size = new Size(15, 14);
+            checkBoxControlSingleAppProcess.Size = new Size(165, 19);
             checkBoxControlSingleAppProcess.TabIndex = 8;
+            checkBoxControlSingleAppProcess.Text = "Control single app process";
             checkBoxControlSingleAppProcess.UseVisualStyleBackColor = true;
             checkBoxControlSingleAppProcess.CheckedChanged += checkBoxControlSingleAppProcess_CheckedChanged;
             // 
@@ -104,20 +108,20 @@ namespace KBMixer
             comboBoxAudioSession.Enabled = false;
             comboBoxAudioSession.FormattingEnabled = true;
             comboBoxAudioSession.IntegralHeight = false;
-            comboBoxAudioSession.Location = new Point(342, 162);
+            comboBoxAudioSession.Location = new Point(280, 149);
             comboBoxAudioSession.Name = "comboBoxAudioSession";
             comboBoxAudioSession.Size = new Size(220, 23);
             comboBoxAudioSession.TabIndex = 9;
             comboBoxAudioSession.SelectedIndexChanged += comboBoxAudioSession_SelectedIndexChanged;
             // 
-            // labelProcessIndex
+            // labelSession
             // 
-            labelProcessIndex.AutoSize = true;
-            labelProcessIndex.Location = new Point(255, 164);
-            labelProcessIndex.Name = "labelProcessIndex";
-            labelProcessIndex.Size = new Size(52, 15);
-            labelProcessIndex.TabIndex = 10;
-            labelProcessIndex.Text = "Session:";
+            labelSession.AutoSize = true;
+            labelSession.Location = new Point(7, 154);
+            labelSession.Name = "labelSession";
+            labelSession.Size = new Size(48, 15);
+            labelSession.TabIndex = 10;
+            labelSession.Text = "Session";
             // 
             // labelConfig
             // 
@@ -212,15 +216,6 @@ namespace KBMixer
             buttonHotkeyReset.UseVisualStyleBackColor = true;
             buttonHotkeyReset.Click += buttonHotkeyReset_Click;
             // 
-            // labelControlSingleAppProcess
-            // 
-            labelControlSingleAppProcess.AutoSize = true;
-            labelControlSingleAppProcess.Location = new Point(73, 164);
-            labelControlSingleAppProcess.Name = "labelControlSingleAppProcess";
-            labelControlSingleAppProcess.Size = new Size(150, 15);
-            labelControlSingleAppProcess.TabIndex = 18;
-            labelControlSingleAppProcess.Text = "Control Single App Process";
-            // 
             // buttonNewConfig
             // 
             buttonNewConfig.Location = new Point(456, 4);
@@ -270,15 +265,40 @@ namespace KBMixer
             buttonAppSet.UseVisualStyleBackColor = true;
             buttonAppSet.Click += buttonAppSet_Click;
             // 
+            // groupBoxHowTo
+            // 
+            groupBoxHowTo.Location = new Point(8, 188);
+            groupBoxHowTo.Name = "groupBoxHowTo";
+            groupBoxHowTo.Size = new Size(596, 120);
+            groupBoxHowTo.TabIndex = 32;
+            groupBoxHowTo.TabStop = false;
+            groupBoxHowTo.Text = "How to use";
+            // 
             // labelInstructions
             // 
+            labelInstructions.AccessibleDescription = "Instructions for using KBMixer";
+            labelInstructions.AccessibleName = "How to use";
             labelInstructions.AutoSize = false;
-            labelInstructions.Location = new Point(56, 200);
+            labelInstructions.Location = new Point(12, 24);
             labelInstructions.Name = "labelInstructions";
-            labelInstructions.Size = new Size(543, 75);
-            labelInstructions.TabIndex = 27;
+            labelInstructions.Size = new Size(560, 88);
+            labelInstructions.TabIndex = 0;
             labelInstructions.Text = resources.GetString("labelInstructions.Text");
-            labelInstructions.TextAlign = ContentAlignment.MiddleCenter;
+            labelInstructions.TextAlign = ContentAlignment.TopCenter;
+            groupBoxHowTo.Controls.Add(labelInstructions);
+            // 
+            // checkBoxOpenAtStartup
+            // 
+            checkBoxOpenAtStartup.AccessibleDescription = "Run KBMixer when you sign in to Windows; starts minimized to the notification area";
+            checkBoxOpenAtStartup.AccessibleName = "Open at Windows startup";
+            checkBoxOpenAtStartup.AutoSize = true;
+            checkBoxOpenAtStartup.Location = new Point(56, 316);
+            checkBoxOpenAtStartup.Name = "checkBoxOpenAtStartup";
+            checkBoxOpenAtStartup.Size = new Size(151, 19);
+            checkBoxOpenAtStartup.TabIndex = 33;
+            checkBoxOpenAtStartup.Text = "Open at Windows startup";
+            checkBoxOpenAtStartup.UseVisualStyleBackColor = true;
+            checkBoxOpenAtStartup.CheckedChanged += checkBoxOpenAtStartup_CheckedChanged;
             // 
             // trayIcon
             // 
@@ -290,25 +310,25 @@ namespace KBMixer
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(612, 285);
-            MinimumSize = new Size(520, 285);
+            ClientSize = new Size(612, 392);
+            MinimumSize = new Size(520, 360);
+            Controls.Add(checkBoxOpenAtStartup);
             Controls.Add(buttonResetDisplayName);
             Controls.Add(textBoxConfigDisplayName);
             Controls.Add(labelConfigDisplayName);
-            Controls.Add(labelInstructions);
+            Controls.Add(groupBoxHowTo);
             Controls.Add(buttonAppSet);
             Controls.Add(textBoxAppSelected);
             Controls.Add(buttonDeleteConfig);
             Controls.Add(buttonRefreshAudio);
             Controls.Add(buttonNewConfig);
-            Controls.Add(labelControlSingleAppProcess);
+            Controls.Add(labelSession);
             Controls.Add(buttonHotkeyReset);
             Controls.Add(buttonHotkeyAdd);
             Controls.Add(textboxHotkeys);
             Controls.Add(labelHotkeys);
             Controls.Add(labelConfig);
             Controls.Add(comboBoxConfig);
-            Controls.Add(labelProcessIndex);
             Controls.Add(comboBoxAudioSession);
             Controls.Add(checkBoxControlSingleAppProcess);
             Controls.Add(appLabel);
@@ -317,6 +337,7 @@ namespace KBMixer
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Form1";
             Text = "KBMixer";
+            groupBoxHowTo.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -328,7 +349,7 @@ namespace KBMixer
         private Label appLabel;
         private CheckBox checkBoxControlSingleAppProcess;
         private ComboBox comboBoxAudioSession;
-        private Label labelProcessIndex;
+        private Label labelSession;
         private Label labelConfig;
         private Label labelConfigDisplayName;
         private TextBox textBoxConfigDisplayName;
@@ -338,13 +359,14 @@ namespace KBMixer
         private TextBox textboxHotkeys;
         private Button buttonHotkeyAdd;
         private Button buttonHotkeyReset;
-        private Label labelControlSingleAppProcess;
         private Button buttonNewConfig;
         private Button buttonRefreshAudio;
         private Button buttonDeleteConfig;
         private TextBox textBoxAppSelected;
         private Button buttonAppSet;
+        private GroupBox groupBoxHowTo;
         private Label labelInstructions;
+        private CheckBox checkBoxOpenAtStartup;
         private NotifyIcon trayIcon;
     }
 }

@@ -24,7 +24,7 @@ namespace KBMixer
             }
 
             bool startMinimized = args.Any(a =>
-                string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase));
+                string.Equals(a, StartupRegistration.MinimizedCommandLineFlag, StringComparison.OrdinalIgnoreCase));
 
             Application.Run(new Form1(startMinimized));
         }
