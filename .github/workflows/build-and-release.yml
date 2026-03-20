@@ -42,11 +42,6 @@ jobs:
           -o "${{ github.workspace }}\artifacts\publish"
           --verbosity minimal
 
-      - name: Zip publish output
-        run: |
-          $zip = "${{ github.workspace }}\artifacts\KBMixer-win-x64.zip"
-          Compress-Archive -Path "${{ github.workspace }}\artifacts\publish\*" -DestinationPath $zip -Force
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -55,10 +50,10 @@ jobs:
           body: |
             Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `main`.
 
-            **Download:** `KBMixer-win-x64.zip` — extract and run `KBMixer.exe` (self-contained **win-x64**).
+            **Download:** `KBMixer.exe` — self-contained **win-x64** single-file publish; run from any folder.
 
             Bump `<Version>` in `KBMixer/KBMixer.csproj` when you want the release title to reflect a new semantic version; the workflow appends `-r{run_number}` so every push gets a unique tag.
-          files: artifacts/KBMixer-win-x64.zip
+          files: artifacts/publish/KBMixer.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
