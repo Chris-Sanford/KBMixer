@@ -70,7 +70,7 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
     public bool ShowAppIcon => Icon != null;
     public bool ShowChevron => !IsMaster;
     public bool ShowExpandedPanel => !IsMaster && IsRowExpanded;
-    public bool ShowDetailText => IsMaster && !string.IsNullOrEmpty(DetailText);
+    public bool ShowDetailText => !string.IsNullOrEmpty(DetailText);
     public bool ShowVolumeGlyph => !IsMaster;
     public bool ShowSetTargetButton => !IsMaster && App != null;
 
@@ -95,7 +95,7 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
         set
         {
             float newScalar = (float)Math.Clamp(value / 100.0, 0, 1);
-            if (Math.Abs(_volumeScalar - newScalar) >= 0.005f)
+            if ((int)Math.Round(newScalar * 100.0) != (int)Math.Round(_volumeScalar * 100.0))
                 VolumeScalar = newScalar;
         }
     }
@@ -105,7 +105,7 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
     public void SyncVolumeFromAudio(float scalar)
     {
         scalar = Math.Clamp(scalar, 0f, 1f);
-        if (Math.Abs(_volumeScalar - scalar) < 0.005f)
+        if ((int)Math.Round(scalar * 100.0) == (int)Math.Round(_volumeScalar * 100.0))
             return;
         _volumeScalar = scalar;
         OnPropertyChanged(nameof(VolumeScalar));

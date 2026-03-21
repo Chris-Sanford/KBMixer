@@ -42,7 +42,6 @@ public sealed partial class MainWindow : Window
     public bool listeningForHotkeyAdd;
 
     bool suspendSessionPickerEvents;
-    bool suspendDeviceMasterEvents;
     bool suspendMixerVolumeEvents;
     bool suspendDeviceComboEvents;
 
@@ -306,6 +305,7 @@ public sealed partial class MainWindow : Window
                         .Where(config => config.Hotkeys.SequenceEqual(hotkeysHeld))
                         .ToArray();
 
+                    bool anyAdjusted = false;
                     foreach (var config in matchingConfigs)
                     {
                         bool isUp = mouseData.Mouse.ButtonData == MouseWheelUp;
@@ -315,7 +315,10 @@ public sealed partial class MainWindow : Window
                                 .FirstOrDefault(d => string.Equals(d.MMDevice.ID, config.DeviceId, StringComparison.OrdinalIgnoreCase))
                                 ?.MMDevice;
                             if (device != null)
+                            {
                                 Audio.TryAdjustEndpointMasterVolume(device, isUp);
+                                anyAdjusted = true;
+                            }
                             continue;
                         }
 
@@ -327,7 +330,11 @@ public sealed partial class MainWindow : Window
                             Audio.AdjustSessionsVolume(sessions, isUp, config.ProcessIndex);
                         else
                             Audio.AdjustSessionsVolume(sessions, isUp, null);
+                        anyAdjusted = true;
                     }
+
+                    if (anyAdjusted)
+                        DispatcherQueue.TryEnqueue(() => RefreshMixerVolumesFromAudio());
                 }
             }
         }
@@ -496,14 +503,25 @@ public sealed partial class MainWindow : Window
             return cmp != 0 ? cmp : a.pid.CompareTo(b.pid);
         });
 
-        var grouped = sessionRows.GroupBy(r => (r.name, r.pid));
+        var groups = sessionRows.GroupBy(r => (r.name, r.pid)).ToList();
 
-        foreach (var group in grouped)
+        var duplicateNames = groups
+            .GroupBy(g => g.Key.name, StringComparer.OrdinalIgnoreCase)
+            .Where(ng => ng.Count() > 1)
+            .Select(ng => ng.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groups)
         {
             var first = group.First();
             var sessions = group.Select(g => g.session).ToList();
             var icon = ProcessIconHelper.TryGetIconForSession(first.session);
-            var ch = new MixerChannelViewModel(false, first.name, icon, first.app, null, sessionsForRow: sessions);
+
+            string? detail = duplicateNames.Contains(first.name) && first.pid > 0
+                ? $"PID {first.pid}"
+                : null;
+
+            var ch = new MixerChannelViewModel(false, first.name, icon, first.app, null, detailText: detail, sessionsForRow: sessions);
             ch.IsHotkeyTarget = Audio.AudioAppMatchesConfigOnDevice(first.app, currentConfig);
 
             try { ch.SyncVolumeFromAudio(sessions[0].SimpleAudioVolume.Volume); }
@@ -897,8 +915,16 @@ public sealed partial class MainWindow : Window
 
     void UpdateTargetAppDisplay()
     {
-        TextAppTarget.Text = currentConfig.AppFriendlyName;
-        ImageAppTarget.Source = ProcessIconHelper.TryGetIconByFriendlyName(audioApps, currentConfig.AppFriendlyName);
+        if (currentConfig.ControlDeviceMasterVolume)
+        {
+            TextAppTarget.Text = "Device master volume";
+            ImageAppTarget.Source = null;
+        }
+        else
+        {
+            TextAppTarget.Text = currentConfig.AppFriendlyName;
+            ImageAppTarget.Source = ProcessIconHelper.TryGetIconByFriendlyName(audioApps, currentConfig.AppFriendlyName);
+        }
     }
 
     void PopulateHotkeys() =>
@@ -912,48 +938,36 @@ public sealed partial class MainWindow : Window
 
     void ApplyVolumeTargetUi()
     {
-        suspendDeviceMasterEvents = true;
-        try
-        {
-            CheckBoxDeviceMasterVolume.IsChecked = currentConfig.ControlDeviceMasterVolume;
-            bool appMode = !currentConfig.ControlDeviceMasterVolume;
-            LabelApp.Opacity = appMode ? 1 : 0.45;
-            ButtonAppChoose.IsEnabled = appMode;
-            CheckBoxSingleSession.IsEnabled = appMode;
-            LabelSession.Opacity = appMode ? 1 : 0.45;
+        bool appMode = !currentConfig.ControlDeviceMasterVolume;
+        CheckBoxSingleSession.IsEnabled = appMode;
+        LabelSession.Opacity = appMode ? 1 : 0.45;
 
-            if (!appMode)
+        if (!appMode)
+        {
+            suspendSessionPickerEvents = true;
+            try
             {
-                suspendSessionPickerEvents = true;
-                try
-                {
-                    ComboBoxAudioSession.Items.Clear();
-                    ComboBoxAudioSession.IsEnabled = false;
-                }
-                finally { suspendSessionPickerEvents = false; }
+                ComboBoxAudioSession.Items.Clear();
+                ComboBoxAudioSession.IsEnabled = false;
             }
-            else
-            {
-                RefreshSessionPickerFromAudio();
-                ComboBoxAudioSession.IsEnabled = currentConfig.ControlSingleSession;
-            }
+            finally { suspendSessionPickerEvents = false; }
         }
-        finally { suspendDeviceMasterEvents = false; }
+        else
+        {
+            RefreshSessionPickerFromAudio();
+            ComboBoxAudioSession.IsEnabled = currentConfig.ControlSingleSession;
+        }
     }
 
-    void CheckBoxDeviceMasterVolume_OnChecked(object sender, RoutedEventArgs e) => OnDeviceMasterVolumeChanged();
-    void CheckBoxDeviceMasterVolume_OnUnchecked(object sender, RoutedEventArgs e) => OnDeviceMasterVolumeChanged();
-
-    void OnDeviceMasterVolumeChanged()
+    void ApplyDeviceMasterChange()
     {
-        if (suspendDeviceMasterEvents)
-            return;
-        currentConfig.ControlDeviceMasterVolume = CheckBoxDeviceMasterVolume.IsChecked == true;
         currentConfig.SaveConfig();
         RebuildSessionCache();
+        UpdateTargetAppDisplay();
         ApplyVolumeTargetUi();
         UpdateConfigComboItemAtSelectedIndex();
         UpdateConfigDisplayNamePlaceholder();
+        RebuildMixerStrip();
         RecomputeMixerHotkeyHighlights();
     }
 
@@ -982,8 +996,6 @@ public sealed partial class MainWindow : Window
         RebuildMixerStrip();
         RecomputeMixerHotkeyHighlights();
     }
-
-    void ComboBoxDevice_OnDropDownOpened(object sender, object e) => RefreshAudioDevicesAndApps();
 
     void ComboBoxAudioSession_OnDropDownOpened(object sender, object e) => RefreshSessionPickerFromAudio();
 
@@ -1130,9 +1142,19 @@ public sealed partial class MainWindow : Window
         RefreshAudioDevicesAndApps();
         await Task.Delay(100);
 
-        var result = await AppSelectionDialog.ShowAsync(Content.XamlRoot, audioApps, currentConfig.AppFriendlyName);
+        var result = await AppSelectionDialog.ShowAsync(
+            Content.XamlRoot, audioApps, currentConfig.AppFriendlyName, currentConfig.ControlDeviceMasterVolume);
         if (result is null)
             return;
+
+        if (result == AppSelectionDialog.DeviceMasterResult)
+        {
+            currentConfig.ControlDeviceMasterVolume = true;
+            ApplyDeviceMasterChange();
+            return;
+        }
+
+        currentConfig.ControlDeviceMasterVolume = false;
 
         var matchingApp = audioApps
             .Where(app => string.Equals(app.DeviceId, currentConfig.DeviceId, StringComparison.OrdinalIgnoreCase))
@@ -1170,13 +1192,9 @@ public sealed partial class MainWindow : Window
 
         currentConfig.AppFileName = selectedAppFileName;
         currentConfig.AppFriendlyName = actualFriendlyName;
-        UpdateTargetAppDisplay();
         currentConfig.ProcessIndex = 0;
+        ApplyDeviceMasterChange();
         PopulateProcessControls();
-        currentConfig.SaveConfig();
-        UpdateConfigComboItemAtSelectedIndex();
-        UpdateConfigDisplayNamePlaceholder();
-        RecomputeMixerHotkeyHighlights();
     }
 
     // ──────────────────── Help & Settings ────────────────────

@@ -1,13 +1,17 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Markup;
+using Microsoft.UI.Xaml.Media;
 
 namespace KBMixer;
 
 /// <summary>Shows a ContentDialog for selecting an audio app (replaces the old WPF AppSelectionWindow).</summary>
 internal static class AppSelectionDialog
 {
-    public static async Task<string?> ShowAsync(XamlRoot xamlRoot, AudioApp[] audioApps, string initialFriendlyName)
+    public const string DeviceMasterResult = "\x01DEVICE_MASTER";
+
+    public static async Task<string?> ShowAsync(
+        XamlRoot xamlRoot, AudioApp[] audioApps, string initialFriendlyName, bool isDeviceMaster)
     {
         var items = audioApps
             .Where(a => !string.IsNullOrWhiteSpace(a.AppFriendlyName))
@@ -27,12 +31,16 @@ internal static class AppSelectionDialog
         var radioSelect = new RadioButton
         {
             Content = "Choose from apps currently playing audio on this PC",
-            GroupName = "AppMode",
-            IsChecked = true
+            GroupName = "AppMode"
         };
         var radioManual = new RadioButton
         {
             Content = "Enter an executable name manually (e.g. chrome.exe)",
+            GroupName = "AppMode"
+        };
+        var radioDeviceMaster = new RadioButton
+        {
+            Content = "Control device master volume (all apps on this output)",
             GroupName = "AppMode"
         };
 
@@ -50,47 +58,75 @@ internal static class AppSelectionDialog
             Visibility = Visibility.Collapsed
         };
 
-        bool isSelectMode = true;
+        var contentArea = new StackPanel { Spacing = 8 };
+        contentArea.Children.Add(listView);
+        contentArea.Children.Add(textBox);
+
+        int mode = 0; // 0 = select, 1 = manual, 2 = device master
 
         radioSelect.Checked += (_, _) =>
         {
-            isSelectMode = true;
+            mode = 0;
             listView.Visibility = Visibility.Visible;
             textBox.Visibility = Visibility.Collapsed;
+            contentArea.Visibility = Visibility.Visible;
         };
         radioManual.Checked += (_, _) =>
         {
-            isSelectMode = false;
+            mode = 1;
             listView.Visibility = Visibility.Collapsed;
             textBox.Visibility = Visibility.Visible;
+            contentArea.Visibility = Visibility.Visible;
             textBox.Focus(FocusState.Programmatic);
         };
-
-        var match = items.FirstOrDefault(i =>
-            string.Equals(i.DisplayName, initialFriendlyName, StringComparison.OrdinalIgnoreCase));
-        if (match != null)
+        radioDeviceMaster.Checked += (_, _) =>
         {
-            radioSelect.IsChecked = true;
-            listView.SelectedItem = match;
+            mode = 2;
+            contentArea.Visibility = Visibility.Collapsed;
+        };
+
+        if (isDeviceMaster)
+        {
+            radioDeviceMaster.IsChecked = true;
+            mode = 2;
+            contentArea.Visibility = Visibility.Collapsed;
         }
         else
         {
-            radioManual.IsChecked = true;
-            textBox.Text = initialFriendlyName;
-            isSelectMode = false;
-            listView.Visibility = Visibility.Collapsed;
-            textBox.Visibility = Visibility.Visible;
+            var match = items.FirstOrDefault(i =>
+                string.Equals(i.DisplayName, initialFriendlyName, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                radioSelect.IsChecked = true;
+                listView.SelectedItem = match;
+            }
+            else
+            {
+                radioManual.IsChecked = true;
+                textBox.Text = initialFriendlyName;
+                mode = 1;
+                listView.Visibility = Visibility.Collapsed;
+                textBox.Visibility = Visibility.Visible;
+            }
         }
+
+        var separator = new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 4, 0, 4),
+            Background = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"]
+        };
 
         var panel = new StackPanel { Spacing = 8 };
         panel.Children.Add(radioSelect);
         panel.Children.Add(radioManual);
-        panel.Children.Add(listView);
-        panel.Children.Add(textBox);
+        panel.Children.Add(radioDeviceMaster);
+        panel.Children.Add(separator);
+        panel.Children.Add(contentArea);
 
         var dialog = new ContentDialog
         {
-            Title = "Select an Application",
+            Title = "Select a Volume Target",
             Content = panel,
             PrimaryButtonText = "OK",
             CloseButtonText = "Cancel",
@@ -102,7 +138,10 @@ internal static class AppSelectionDialog
         if (result != ContentDialogResult.Primary)
             return null;
 
-        if (isSelectMode)
+        if (mode == 2)
+            return DeviceMasterResult;
+
+        if (mode == 0)
             return (listView.SelectedItem as AppPickItem)?.DisplayName;
 
         var text = textBox.Text.Trim();
@@ -111,7 +150,6 @@ internal static class AppSelectionDialog
 
     static DataTemplate CreateItemTemplate()
     {
-        // FontIcon behind Image: when Icon is null, Image is transparent and the fallback glyph shows
         const string xaml = """
             <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                           xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">

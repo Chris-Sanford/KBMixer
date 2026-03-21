@@ -52,8 +52,7 @@
 
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Output device" Margin="0,0,0,8"/>
                         <ComboBox x:Name="ComboBoxDevice" HorizontalAlignment="Stretch" Margin="0,0,0,14"
-                                  SelectionChanged="ComboBoxDevice_OnSelectionChanged"
-                                  DropDownOpened="ComboBoxDevice_OnDropDownOpened"/>
+                                  SelectionChanged="ComboBoxDevice_OnSelectionChanged"/>
 
                         <!-- Master volume + app rows share identical column layout for alignment -->
                         <ItemsControl x:Name="MasterMixerItems">
@@ -99,10 +98,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Apps" Margin="0,14,0,0"/>
-                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,2,0,8"
-                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                   Text="Per-app levels for this output. Use the chevron for KBMixer profile actions."/>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Apps" Margin="0,14,0,8"/>
 
                         <ItemsControl x:Name="AppMixerItems">
                             <ItemsControl.ItemTemplate>
@@ -134,8 +130,12 @@
                                                               Visibility="{Binding ShowFallbackIcon, Converter={StaticResource BoolToVis}}"/>
                                                 </Grid>
 
-                                                <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
-                                                           Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding DetailText}" Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis"
+                                                               Visibility="{Binding ShowDetailText, Converter={StaticResource BoolToVis}}"/>
+                                                </StackPanel>
 
                                                 <FontIcon Grid.Column="2" Glyph="&#xE995;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center"
@@ -199,7 +199,6 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <!-- Row 0: Profile -->
@@ -234,31 +233,26 @@
                                         Click="ButtonHotkeyReset_OnClick"/>
                             </StackPanel>
 
-                            <!-- Row 3: Device master volume checkbox -->
-                            <CheckBox x:Name="CheckBoxDeviceMasterVolume" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
-                                      Content="Control whole device master volume (all apps on this output) instead of one app"
-                                      Checked="CheckBoxDeviceMasterVolume_OnChecked" Unchecked="CheckBoxDeviceMasterVolume_OnUnchecked"/>
-
-                            <!-- Row 4: Target app -->
-                            <TextBlock x:Name="LabelApp" Grid.Row="4" Grid.Column="0" Text="Target app" VerticalAlignment="Center"
+                            <!-- Row 3: Target -->
+                            <TextBlock x:Name="LabelApp" Grid.Row="3" Grid.Column="0" Text="Target" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <Image x:Name="ImageAppTarget" Width="20" Height="20" Stretch="Uniform"/>
                                 <TextBlock x:Name="TextAppTarget" VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextBlockStyle}"/>
                             </StackPanel>
-                            <Button x:Name="ButtonAppChoose" Grid.Row="4" Grid.Column="2" Content="Choose…"
+                            <Button x:Name="ButtonAppChoose" Grid.Row="3" Grid.Column="2" Content="Choose…"
                                     MinWidth="72" Padding="14,7" Click="ButtonAppChoose_OnClick"/>
 
-                            <!-- Row 5: Session -->
-                            <TextBlock x:Name="LabelSession" Grid.Row="5" Grid.Column="0" Text="Session" VerticalAlignment="Center"
+                            <!-- Row 4: Session -->
+                            <TextBlock x:Name="LabelSession" Grid.Row="4" Grid.Column="0" Text="Session" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <CheckBox x:Name="CheckBoxSingleSession" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2"
-                                      Content="Only one session when the app has multiple mixer entries"
+                            <CheckBox x:Name="CheckBoxSingleSession" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
+                                      Content="Control a specific session when the app has multiple mixer entries"
                                       Checked="CheckBoxSingleSession_OnChecked" Unchecked="CheckBoxSingleSession_OnUnchecked"/>
 
-                            <!-- Row 6: Session picker -->
-                            <ComboBox x:Name="ComboBoxAudioSession" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3"
+                            <!-- Row 5: Session picker -->
+                            <ComboBox x:Name="ComboBoxAudioSession" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3"
                                       HorizontalAlignment="Stretch"
                                       SelectionChanged="ComboBoxAudioSession_OnSelectionChanged"
                                       DropDownOpened="ComboBoxAudioSession_OnDropDownOpened"/>
