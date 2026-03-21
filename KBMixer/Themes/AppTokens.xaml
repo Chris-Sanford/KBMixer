@@ -8,9 +8,6 @@
     <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
     <local:BoolToChevronGlyphConverter x:Key="BoolToChevron"/>
 
-    <!-- App-specific tokens (WinUI 3 handles standard Fluent colors/styles natively) -->
-    <SolidColorBrush x:Key="HighlightRowBrush" Color="#2B3F55"/>
-
     <Style x:Key="UiCard" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
         <Setter Property="CornerRadius" Value="8"/>

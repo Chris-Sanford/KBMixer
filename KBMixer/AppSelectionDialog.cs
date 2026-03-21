@@ -111,10 +111,17 @@ internal static class AppSelectionDialog
 
     static DataTemplate CreateItemTemplate()
     {
+        // FontIcon behind Image: when Icon is null, Image is transparent and the fallback glyph shows
         const string xaml = """
-            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
                 <StackPanel Orientation="Horizontal" Spacing="10" Padding="2,4">
-                    <Image Source="{Binding Icon}" Width="24" Height="24" Stretch="Uniform"/>
+                    <Grid Width="24" Height="24">
+                        <FontIcon Glyph="&#xE8D6;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
+                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Image Source="{Binding Icon}" Width="24" Height="24" Stretch="Uniform"/>
+                    </Grid>
                     <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
                 </StackPanel>
             </DataTemplate>

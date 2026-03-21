@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using Microsoft.UI.Xaml.Media;
+using NAudio.CoreAudioApi;
 
 namespace KBMixer;
 
@@ -12,21 +13,21 @@ internal static class ProcessIconHelper
     {
         if (app.Sessions.Count == 0)
             return null;
+        return TryGetIconForSession(app.Sessions[0]);
+    }
 
-        var first = app.Sessions[0];
+    public static ImageSource? TryGetIconForSession(AudioSessionControl session)
+    {
         try
         {
-            if (first.IsSystemSoundsSession)
+            if (session.IsSystemSoundsSession)
                 return null;
         }
-        catch
-        {
-            return null;
-        }
+        catch { return null; }
 
         try
         {
-            uint pid = first.GetProcessID;
+            uint pid = session.GetProcessID;
             if (pid == 0)
                 return null;
 
@@ -45,5 +46,13 @@ internal static class ProcessIconHelper
         catch { }
 
         return null;
+    }
+
+    /// <summary>Finds an icon for an app by friendly name from the current session list.</summary>
+    public static ImageSource? TryGetIconByFriendlyName(AudioApp[] audioApps, string friendlyName)
+    {
+        var app = audioApps.FirstOrDefault(a =>
+            string.Equals(a.AppFriendlyName, friendlyName, StringComparison.OrdinalIgnoreCase));
+        return app != null ? TryGetIconForAudioApp(app) : null;
     }
 }
