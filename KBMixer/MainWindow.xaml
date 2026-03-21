@@ -1,0 +1,263 @@
+<Window
+    x:Class="KBMixer.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:KBMixer"
+    Title="KBMixer">
+
+    <Grid x:Name="RootGrid">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ContentPanel" Padding="28,24,28,32" MaxWidth="680" HorizontalAlignment="Left">
+
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="KBMixer"/>
+                <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,6,0,20"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Text="Per-app levels and hotkey profiles."/>
+
+                <!-- System / Mixer card -->
+                <Border Style="{StaticResource UiCard}" Margin="0,0,0,14" Padding="20,18,20,14">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="System" Margin="0,0,0,4"/>
+                        <ItemsControl x:Name="MasterMixerItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <Grid MinHeight="40">
+                                            <!-- Hotkey highlight background -->
+                                            <Border Background="{StaticResource HighlightRowBrush}" CornerRadius="4"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+                                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="2"
+                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+
+                                            <Grid Padding="8,10" ColumnSpacing="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*" MinWidth="80" MaxWidth="220"/>
+                                                    <ColumnDefinition Width="28"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*" MinWidth="120"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Grid Grid.Column="0" Width="32" Height="32" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE995;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16"
+                                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                              Visibility="{Binding ShowMasterIcon, Converter={StaticResource BoolToVis}}"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding DetailText}" Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Visibility="{Binding ShowDetailText, Converter={StaticResource BoolToVis}}"/>
+                                                </StackPanel>
+
+                                                <TextBlock Grid.Column="3" Text="{Binding VolumePercentText}"
+                                                           Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center"
+                                                           TextAlignment="Right" Margin="0,0,8,0"/>
+
+                                                <Slider Grid.Column="4" VerticalAlignment="Center"
+                                                        Minimum="0" Maximum="100"
+                                                        Value="{Binding VolumePercent, Mode=TwoWay}"
+                                                        ValueChanged="MixerSlider_OnValueChanged"/>
+                                            </Grid>
+                                        </Grid>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Output device" Margin="0,18,0,8"/>
+                        <ComboBox x:Name="ComboBoxDevice" HorizontalAlignment="Stretch" Margin="0,0,0,2"
+                                  SelectionChanged="ComboBoxDevice_OnSelectionChanged"/>
+
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Apps" Margin="0,14,0,0"/>
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,2,0,8"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   Text="Per-app levels for this output. Use the chevron for KBMixer profile actions."/>
+
+                        <ItemsControl x:Name="AppMixerItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <Grid MinHeight="40">
+                                            <Border Background="{StaticResource HighlightRowBrush}" CornerRadius="4"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+                                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="2"
+                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+
+                                            <Grid Padding="8,10" ColumnSpacing="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*" MinWidth="80" MaxWidth="220"/>
+                                                    <ColumnDefinition Width="28"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*" MinWidth="120"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Grid Grid.Column="0" Width="32" Height="32" VerticalAlignment="Center">
+                                                    <Image Source="{Binding Icon}" Width="28" Height="28" Stretch="Uniform"
+                                                           Visibility="{Binding ShowAppIcon, Converter={StaticResource BoolToVis}}"/>
+                                                    <FontIcon Glyph="&#xE8D6;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
+                                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                              Visibility="{Binding ShowFallbackIcon, Converter={StaticResource BoolToVis}}"/>
+                                                </Grid>
+
+                                                <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
+                                                           Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+
+                                                <FontIcon Grid.Column="2" Glyph="&#xE995;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
+                                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center"
+                                                          ToolTipService.ToolTip="Output level"
+                                                          Visibility="{Binding ShowVolumeGlyph, Converter={StaticResource BoolToVis}}"/>
+
+                                                <TextBlock Grid.Column="3" Text="{Binding VolumePercentText}"
+                                                           Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center"
+                                                           TextAlignment="Right" Margin="0,0,8,0"/>
+
+                                                <Slider Grid.Column="4" VerticalAlignment="Center"
+                                                        Minimum="0" Maximum="100"
+                                                        Value="{Binding VolumePercent, Mode=TwoWay}"
+                                                        ValueChanged="MixerSlider_OnValueChanged"/>
+
+                                                <ToggleButton Grid.Column="5" Style="{StaticResource ChevronToggle}"
+                                                              VerticalAlignment="Center" HorizontalAlignment="Right"
+                                                              IsChecked="{Binding IsRowExpanded, Mode=TwoWay}"
+                                                              Visibility="{Binding ShowChevron, Converter={StaticResource BoolToVis}}">
+                                                    <FontIcon Glyph="{Binding IsRowExpanded, Converter={StaticResource BoolToChevron}}"
+                                                              FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12"/>
+                                                </ToggleButton>
+                                            </Grid>
+                                        </Grid>
+
+                                        <!-- Expanded panel -->
+                                        <StackPanel Visibility="{Binding ShowExpandedPanel, Converter={StaticResource BoolToVis}}"
+                                                    Padding="52,0,44,12">
+                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,0,0,8"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       Text="KBMixer: bind this app to the current profile's hotkeys."/>
+                                            <HyperlinkButton Content="Set as profile target"
+                                                             Click="MixerUseForProfile_OnClick" Tag="{Binding}"
+                                                             Visibility="{Binding ShowSetTargetButton, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Profile and hotkeys card -->
+                <Border Style="{StaticResource UiCard}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Profile &amp; hotkeys" Margin="0,0,0,2"/>
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,0,0,14"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   Text="Profiles store device, target app, and hotkeys. Styling matches the mixer card above."/>
+
+                        <Grid ColumnSpacing="10" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="128"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Profile" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <ComboBox x:Name="ComboBoxConfig" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                                      SelectionChanged="ComboBoxConfig_OnSelectionChanged"/>
+                            <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="ButtonNewConfig" Content="New" MinWidth="76" Padding="14,8"
+                                        Click="ButtonNewConfig_OnClick"/>
+                                <Button x:Name="ButtonDeleteConfig" Content="Delete" MinWidth="76"
+                                        Click="ButtonDeleteConfig_OnClick"/>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Display name" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBox x:Name="TextBoxConfigDisplayName" Grid.Row="1" Grid.Column="1"
+                                     ToolTipService.ToolTip="Leave blank to use the automatic name (app + hotkeys + device)."
+                                     LostFocus="TextBoxConfigDisplayName_OnLostFocus"/>
+                            <Button x:Name="ButtonResetDisplayName" Grid.Row="1" Grid.Column="2" Content="Reset"
+                                    Click="ButtonResetDisplayName_OnClick"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Hotkeys" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBox x:Name="TextBoxHotkeys" Grid.Row="2" Grid.Column="1" IsReadOnly="True"/>
+                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="ButtonHotkeyAdd" Content="Add" MinWidth="64"
+                                        Click="ButtonHotkeyAdd_OnClick"/>
+                                <Button x:Name="ButtonHotkeyReset" Content="Reset" MinWidth="64"
+                                        Click="ButtonHotkeyReset_OnClick"/>
+                            </StackPanel>
+
+                            <CheckBox x:Name="CheckBoxDeviceMasterVolume" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
+                                      Content="Control whole device master volume (all apps on this output) instead of one app"
+                                      Checked="CheckBoxDeviceMasterVolume_OnChecked" Unchecked="CheckBoxDeviceMasterVolume_OnUnchecked"/>
+
+                            <TextBlock x:Name="LabelApp" Grid.Row="4" Grid.Column="0" Text="Target app" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBox x:Name="TextBoxAppTarget" Grid.Row="4" Grid.Column="1" IsReadOnly="True"/>
+                            <Button x:Name="ButtonAppChoose" Grid.Row="4" Grid.Column="2" Content="Choose…"
+                                    Click="ButtonAppChoose_OnClick"/>
+
+                            <TextBlock x:Name="LabelSession" Grid.Row="5" Grid.Column="0" Text="Session" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <CheckBox x:Name="CheckBoxSingleSession" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2"
+                                      Content="Only one session when the app has multiple mixer entries"
+                                      Checked="CheckBoxSingleSession_OnChecked" Unchecked="CheckBoxSingleSession_OnUnchecked"/>
+
+                            <ComboBox x:Name="ComboBoxAudioSession" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2"
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="ComboBoxAudioSession_OnSelectionChanged"/>
+
+                            <Button x:Name="ButtonRefreshAudio" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" HorizontalAlignment="Left"
+                                    Content="Refresh audio devices and sessions"
+                                    Click="ButtonRefreshAudio_OnClick"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Expander x:Name="ExpanderHowTo" Header="How KBMixer works" Margin="0,0,0,12" IsExpanded="False"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="10" Margin="0,8,0,0">
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run FontWeight="SemiBold">1. </Run>
+                            <Run Text="Pick a profile, device, and hotkeys (Add, then press keys)."/>
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run FontWeight="SemiBold">2. </Run>
+                            <Run Text="Choose app vs. device master volume, optionally one session."/>
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run FontWeight="SemiBold">3. </Run>
+                            <Run Text="Hold your hotkeys and scroll the mouse wheel to change volume anywhere."/>
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run FontWeight="SemiBold">4. </Run>
+                            <Run Text="Keep KBMixer running; minimize to the notification area."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Expander>
+
+                <CheckBox x:Name="CheckBoxOpenAtStartup"
+                          Content="Open KBMixer when Windows starts (minimized to the notification area)"
+                          Checked="CheckBoxOpenAtStartup_OnChecked" Unchecked="CheckBoxOpenAtStartup_OnUnchecked"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

@@ -1,28 +1,27 @@
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace KBMixer;
 
-/// <summary>Loads the application icon from the built .exe (PE icon) or <c>KBMixer.ico</c> beside the exe.</summary>
+/// <summary>Loads the application icon from the built .exe (PE icon) or KBMixer.ico beside the exe.</summary>
 internal static class AppIconHelper
 {
-    public static void ApplyApplicationIcon(Form form, NotifyIcon? notifyIcon = null)
+    static readonly string IconCacheDir = Path.Combine(Path.GetTempPath(), "KBMixer", "icons");
+
+    public static void ApplyWindowIcon(Microsoft.UI.Windowing.AppWindow appWindow)
     {
-        ArgumentNullException.ThrowIfNull(form);
-
-        using var source = TryLoadSourceIcon();
-        if (source is null)
-            return;
-
-        form.Icon = new Icon(source, source.Size);
-        if (notifyIcon is not null)
-            notifyIcon.Icon = new Icon(source, source.Size);
+        var icoPath = Path.Combine(AppContext.BaseDirectory, "KBMixer.ico");
+        if (File.Exists(icoPath))
+            appWindow.SetIcon(icoPath);
     }
 
-    private static Icon? TryLoadSourceIcon()
+    public static Icon? TryLoadSystemDrawingIcon()
     {
         try
         {
-            var exe = Environment.ProcessPath ?? Application.ExecutablePath;
+            var exe = Environment.ProcessPath;
             if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
             {
                 using var fromExe = Icon.ExtractAssociatedIcon(exe);
@@ -30,10 +29,7 @@ internal static class AppIconHelper
                     return new Icon(fromExe, fromExe.Size);
             }
         }
-        catch
-        {
-            // Design-time or unusual hosts
-        }
+        catch { }
 
         try
         {
@@ -41,11 +37,32 @@ internal static class AppIconHelper
             if (File.Exists(ico))
                 return new Icon(ico);
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
 
         return null;
+    }
+
+    /// <summary>Converts a System.Drawing.Icon to a WinUI 3 ImageSource via temp PNG cache.</summary>
+    public static Microsoft.UI.Xaml.Media.ImageSource? ToImageSource(Icon icon, string cacheKey)
+    {
+        try
+        {
+            Directory.CreateDirectory(IconCacheDir);
+            var safeName = string.Concat(cacheKey.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+            if (string.IsNullOrEmpty(safeName)) safeName = "icon";
+            var cachePath = Path.Combine(IconCacheDir, safeName + ".png");
+
+            if (!File.Exists(cachePath))
+            {
+                using var bitmap = icon.ToBitmap();
+                bitmap.Save(cachePath, ImageFormat.Png);
+            }
+
+            return new BitmapImage(new Uri(cachePath));
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

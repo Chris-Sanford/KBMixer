@@ -10,8 +10,8 @@ namespace KBMixer
 {
     public class AudioDevice
     {
-        public required MMDevice MMDevice { get; set; }
-        public required AudioApp[] AudioApps { get; set; }
+        public MMDevice MMDevice { get; set; } = null!;
+        public AudioApp[] AudioApps { get; set; } = Array.Empty<AudioApp>();
     }
 
     public class AudioApp // Object class to represnt an audio application controllable by KBMixer
@@ -28,10 +28,10 @@ namespace KBMixer
         public const string down = "Down";
 
         // AudioApps should be per-device:per-app rather than per-app regardless of device
-        public required string DeviceId { get; set; }
-        public required string AppFriendlyName { get; set; } // To display in GUI, esp. for System Sounds
-        public required string AppFileName { get; set; } // For Audio Control Logic
-        public required List<AudioSessionControl> Sessions { get; set; } // Collection of Sessions for this App
+        public string DeviceId { get; set; } = "";
+        public string AppFriendlyName { get; set; } = "";
+        public string AppFileName { get; set; } = "";
+        public List<AudioSessionControl> Sessions { get; set; } = new();
 
         public void AdjustVolume(bool isUp, int? processIndex = null) =>
             Audio.AdjustSessionsVolume(Sessions, isUp, processIndex);
@@ -69,6 +69,38 @@ namespace KBMixer
             {
                 Debug.WriteLine($"TryAdjustEndpointMasterVolume: {ex.Message}");
                 return false;
+            }
+        }
+
+        public static bool TrySetEndpointMasterVolumeScalar(MMDevice device, float scalar)
+        {
+            try
+            {
+                device.AudioEndpointVolume.MasterVolumeLevelScalar = Math.Clamp(scalar, 0f, 1f);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"TrySetEndpointMasterVolumeScalar: {ex.Message}");
+                return false;
+            }
+        }
+
+        public static void SetSessionsVolumeScalar(IReadOnlyList<AudioSessionControl> sessions, float scalar)
+        {
+            if (sessions == null || sessions.Count == 0)
+                return;
+            scalar = Math.Clamp(scalar, 0f, 1f);
+            foreach (var session in sessions)
+            {
+                try
+                {
+                    session.SimpleAudioVolume.Volume = scalar;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"SetSessionsVolumeScalar: {ex.Message}");
+                }
             }
         }
 
@@ -165,6 +197,24 @@ namespace KBMixer
                 return true;
 
             return false;
+        }
+
+        public static bool SessionBelongsToConfig(AudioSessionControl session, Config config)
+        {
+            if (!TryGetAppIdentity(session, out string appFileName, out string appFriendlyName))
+                return false;
+            string disp = (session.DisplayName ?? "").Trim();
+            return SessionMatchesConfig(appFileName, disp, appFriendlyName, config.AppFileName, config.AppFriendlyName);
+        }
+
+        /// <summary>True when any session in <paramref name="app"/> is the hotkey target described by <paramref name="config"/>.</summary>
+        public static bool AudioAppMatchesConfigOnDevice(AudioApp app, Config config)
+        {
+            if (config.ControlDeviceMasterVolume)
+                return false;
+            if (!string.Equals(app.DeviceId, config.DeviceId, StringComparison.OrdinalIgnoreCase))
+                return false;
+            return app.Sessions.Any(s => SessionBelongsToConfig(s, config));
         }
 
         /// <summary>Sessions on <paramref name="device"/> that match <paramref name="config"/> (device id + app identity).</summary>

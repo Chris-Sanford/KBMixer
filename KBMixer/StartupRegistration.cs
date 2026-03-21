@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Win32;
 
 namespace KBMixer
@@ -19,7 +20,10 @@ namespace KBMixer
             if (string.IsNullOrWhiteSpace(raw) || !TryParseExecutableFromRunValue(raw, out string? exe) || exe is null)
                 return false;
 
-            return PathsReferToSameFile(exe, Application.ExecutablePath);
+            string? thisExe = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(thisExe))
+                return false;
+            return PathsReferToSameFile(exe, thisExe);
         }
 
         internal static void SetRegistered(bool enable)
@@ -29,7 +33,8 @@ namespace KBMixer
 
             if (enable)
             {
-                string exe = Application.ExecutablePath;
+                string exe = Environment.ProcessPath
+                    ?? throw new InvalidOperationException("Could not determine the executable path.");
                 string command = $"\"{exe}\" {MinimizedCommandLineFlag}";
                 key.SetValue(RegistryValueName, command, RegistryValueKind.String);
             }
