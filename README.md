@@ -29,3 +29,7 @@ dotnet restore KBMixer.sln
 dotnet build KBMixer.sln -r win-x64
 dotnet run --project KBMixer\KBMixer.csproj -r win-x64
 ```
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
