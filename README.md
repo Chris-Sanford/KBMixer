@@ -18,8 +18,8 @@
 
 Every push to `main` publishes a [GitHub release](https://github.com/Chris-Sanford/KBMixer/releases/latest) with two **win-x64** flavors:
 
-- **`KBMixer.exe` (self-contained)** — runs on any 64-bit Windows 10 1903+ machine with nothing else installed. Larger download and a slower first launch while the bundled runtime unpacks.
-- **`KBMixer-framework-dependent.zip` (framework-dependent)** — much smaller and starts faster, but requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) and the [Windows App SDK 1.6 runtime](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads). Unzip anywhere and run `KBMixer.exe`.
+- **`KBMixer.exe` (self-contained single-file)** — runs on any 64-bit Windows 10 1903+ machine with nothing else installed. Dependencies are extracted to a temporary directory on first launch.
+- **`KBMixer-framework-dependent.zip` (framework-dependent)** — much smaller and starts faster, but requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) and the [Windows App SDK 2.5 runtime](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads). Unzip anywhere and run `KBMixer.exe`.
 
 KBMixer checks GitHub for a newer release on startup and offers a download link if one is available. Set the `KBMIXER_NO_UPDATE_CHECK` environment variable to disable the check.
 

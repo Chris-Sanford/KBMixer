@@ -58,14 +58,25 @@ namespace KBMixer
 
                 var tag = root.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() : null;
                 var htmlUrl = root.TryGetProperty("html_url", out var htmlEl) ? htmlEl.GetString() : null;
-                string? exeUrl = null;
+                string? downloadUrl = null;
                 if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
                 {
+                    string? fallbackExeUrl = null;
                     foreach (var asset in assets.EnumerateArray())
                     {
+                        var name = asset.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
                         var url = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() : null;
-                        if (url != null && url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) { exeUrl = url; break; }
+                        if (url == null)
+                            continue;
+                        if (string.Equals(name, "KBMixer-self-contained.zip", StringComparison.OrdinalIgnoreCase))
+                        {
+                            downloadUrl = url;
+                            break;
+                        }
+                        if (fallbackExeUrl == null && url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                            fallbackExeUrl = url;
                     }
+                    downloadUrl ??= fallbackExeUrl;
                 }
 
                 var latest = ParseTagVersion(tag) ?? throw new FormatException($"Unrecognized release tag '{tag}'.");
@@ -83,7 +94,7 @@ namespace KBMixer
                     };
                     if (await dialog.ShowAsync() == ContentDialogResult.Primary)
                     {
-                        var target = exeUrl ?? htmlUrl ?? ReleasesPageUrl;
+                        var target = downloadUrl ?? htmlUrl ?? ReleasesPageUrl;
                         Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
                     }
                 }

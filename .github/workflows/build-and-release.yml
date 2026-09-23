@@ -35,12 +35,14 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($v)) { throw "Could not read Version from KBMixer.csproj" }
           "version=$v" >> $env:GITHUB_OUTPUT
 
-      - name: Publish self-contained (Release, win-x64)
+      - name: Publish self-contained single file (Release, win-x64)
         run: >
           dotnet publish KBMixer\KBMixer.csproj
           -c Release
           -o "${{ github.workspace }}\artifacts\publish"
           -p:PublishSingleFile=true
+          -p:SelfContained=true
+          -p:WindowsAppSDKSelfContained=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:IncludeAllContentForSelfExtract=true
           --verbosity minimal
@@ -73,8 +75,8 @@ jobs:
 
             **Downloads (win-x64):**
 
-            - `KBMixer.exe` — **self-contained** publish. Runs on any 64-bit Windows 10 1903+ machine with nothing else installed, but the file is large and the first launch is slower while the bundled runtime unpacks.
-            - `KBMixer-framework-dependent.zip` — **framework-dependent** publish. Much smaller and starts faster, but requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) and the [Windows App SDK 1.6 runtime](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) to be installed. Unzip anywhere and run `KBMixer.exe`.
+            - `KBMixer.exe` — **self-contained single-file** publish. Runs on a 64-bit Windows 10 1903+ machine with nothing else installed; dependencies are extracted to a temporary directory on first launch.
+            - `KBMixer-framework-dependent.zip` — **framework-dependent** publish. Much smaller and starts faster, but requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) and the [Windows App SDK 2.5 runtime](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) to be installed. Unzip anywhere and run `KBMixer.exe`.
           files: |
             artifacts/publish/KBMixer.exe
             artifacts/KBMixer-framework-dependent.zip
