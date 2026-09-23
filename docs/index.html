@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KBMixer</title>
+  <meta name="description" content="Control per-app volume with hotkeys + scroll wheel, from anywhere on Windows.">
+  <style>
+    :root {
+      --bg: #0f1115; --panel: #171a21; --border: #262b36;
+      --text: #e6e8ee; --muted: #9aa3b2; --accent: #4f8cff; --accent-hover: #6b9fff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    main { max-width: 900px; margin: 0 auto; padding: 64px 24px 32px; text-align: center; }
+    h1 { font-size: 3rem; margin: 0 0 8px; letter-spacing: -0.02em; }
+    .tagline { color: var(--muted); font-size: 1.25rem; margin: 0 0 32px; }
+    .button {
+      display: inline-block; background: var(--accent); color: #fff; text-decoration: none;
+      font-weight: 600; padding: 14px 28px; border-radius: 8px; transition: background 0.15s;
+    }
+    .button:hover, .button:focus { background: var(--accent-hover); }
+    .note { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
+    .note a { color: var(--muted); }
+    .shot {
+      margin: 48px 0; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--panel); padding: 12px;
+    }
+    .shot img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 0 auto; }
+    .features {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px; list-style: none; padding: 0; margin: 0 0 48px; text-align: left;
+    }
+    .features li {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    }
+    .features h2 { font-size: 1.05rem; margin: 0 0 6px; }
+    .features p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; padding: 24px; text-align: center; }
+    footer a { color: var(--text); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>KBMixer</h1>
+    <p class="tagline">Control per-app volume with hotkeys + scroll wheel, from anywhere on Windows</p>
+
+    <a class="button" href="https://github.com/Chris-Sanford/KBMixer/releases/latest">Download latest release</a>
+    <p class="note">Windows 10 1903+ &middot; 64-bit &middot; free and open source</p>
+
+    <div class="shot">
+      <img src="screenshot.png" alt="KBMixer main window showing per-application volume channels" width="800">
+    </div>
+
+    <ul class="features">
+      <li>
+        <h2>Per-app volume, no window switching</h2>
+        <p>Adjust Spotify, Discord, your game, or anything else without alt-tabbing to the Windows volume mixer.</p>
+      </li>
+      <li>
+        <h2>Hold a hotkey, scroll to adjust</h2>
+        <p>Bind a global hotkey to each app and turn your mouse wheel into a dedicated volume knob.</p>
+      </li>
+      <li>
+        <h2>Lightweight and out of the way</h2>
+        <p>Runs quietly in the system tray, remembers your channels, and starts working the moment you launch it.</p>
+      </li>
+    </ul>
+  </main>
+
+  <footer>
+    <a href="https://github.com/Chris-Sanford/KBMixer">KBMixer on GitHub</a> &middot; Issues, source code, and contributions welcome.
+  </footer>
+</body>
+</html>

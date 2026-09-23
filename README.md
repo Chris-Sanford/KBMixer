@@ -3,6 +3,26 @@
 
 ![KBMixer screenshot](assets/screenshot.png)
 
+## Demo
+
+<!--
+  TODO: add a short looping demo GIF at assets/demo.gif and uncomment the line below.
+  Record ~10 seconds with ScreenToGif (https://www.screentogif.com/) or ShareX (https://getsharex.com/):
+  hold an app's hotkey and scroll the mouse wheel so the volume bar visibly moves, then release.
+  Keep it small (under ~5 MB, ~800px wide) so it loads quickly on GitHub.
+
+![KBMixer demo](assets/demo.gif)
+-->
+
+## Downloads
+
+Every push to `main` publishes a [GitHub release](https://github.com/Chris-Sanford/KBMixer/releases/latest) with two **win-x64** flavors:
+
+- **`KBMixer.exe` (self-contained)** — runs on any 64-bit Windows 10 1903+ machine with nothing else installed. Larger download and a slower first launch while the bundled runtime unpacks.
+- **`KBMixer-framework-dependent.zip` (framework-dependent)** — much smaller and starts faster, but requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) and the [Windows App SDK 1.6 runtime](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads). Unzip anywhere and run `KBMixer.exe`.
+
+KBMixer checks GitHub for a newer release on startup and offers a download link if one is available. Set the `KBMIXER_NO_UPDATE_CHECK` environment variable to disable the check.
+
 ## Development
 
 KBMixer targets **.NET 8** (`net8.0-windows10.0.19041.0`) and the **Windows App SDK (WinUI 3)**. You need **Windows 10 1903+** and tooling that includes the Windows application development workload.

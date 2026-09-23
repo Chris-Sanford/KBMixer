@@ -101,6 +101,7 @@ public sealed partial class MainWindow : Window
             audioApps = audioAppsList.ToArray();
 
             configs = Configurations.LoadConfigsFromDisk();
+            ReconcileConfigDevices();
             if (configs.Length == 0)
                 ButtonNewConfig_OnClick(this, new RoutedEventArgs());
             else
@@ -125,8 +126,9 @@ public sealed partial class MainWindow : Window
                 mixerRefreshTimer.Tick += (_, _) => OnRefreshTimerTick();
                 mixerRefreshTimer.Start();
 
-                ShowMissingAudioDevicesWarningIfNeeded();
+                ShowDeviceRebindNoticeIfNeeded();
                 ShowConfigLoadErrorIfNeeded();
+                _ = UpdateChecker.CheckAndPromptAsync(Content.XamlRoot);
             }
         };
 
@@ -258,6 +260,18 @@ public sealed partial class MainWindow : Window
         var icoPath = Path.Combine(AppContext.BaseDirectory, "KBMixer.ico");
         if (File.Exists(icoPath))
             trayIcon.Icon = new System.Drawing.Icon(icoPath);
+        // Right-click menu: native Win32 popup so it works for unpackaged WinUI while the window is hidden.
+        var menu = new MenuFlyout();
+        var openItem = new MenuFlyoutItem { Text = "Open KBMixer" };
+        openItem.Click += (_, _) => ShowFromTray();
+        var exitItem = new MenuFlyoutItem { Text = "Exit" };
+        exitItem.Click += (_, _) => ExitFromTray();
+        menu.Items.Add(openItem);
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(exitItem);
+        trayIcon.ContextMenuMode = H.NotifyIcon.ContextMenuMode.PopupMenu;
+        trayIcon.ContextFlyout = menu;
+
         trayIcon.ForceCreate();
         trayIcon.Visibility = Visibility.Collapsed;
         trayIcon.NoLeftClickDelay = true;
@@ -269,6 +283,16 @@ public sealed partial class MainWindow : Window
         _appWindow?.Show();
         if (trayIcon != null)
             trayIcon.Visibility = Visibility.Collapsed;
+
+        // The app list may be stale after sitting in the tray; refresh as soon as the window is shown.
+        try { RefreshAudioDevicesAndApps(); }
+        catch { }
+    }
+
+    void ExitFromTray()
+    {
+        _closeConfirmed = true;
+        DispatcherQueue.TryEnqueue(() => Close());
     }
 
     void SetupRawInput()
@@ -302,7 +326,7 @@ public sealed partial class MainWindow : Window
                 if (isMouseWheel && wasUpOrDown)
                 {
                     var matchingConfigs = configs
-                        .Where(config => config.Hotkeys.SequenceEqual(hotkeysHeld))
+                        .Where(config => config.Hotkeys.Length > 0 && config.Hotkeys.SequenceEqual(hotkeysHeld))
                         .ToArray();
 
                     bool anyAdjusted = false;
@@ -401,12 +425,37 @@ public sealed partial class MainWindow : Window
 
     // ──────────────────── Refresh timer ────────────────────
 
+    // Timer runs at 120ms. Every ~3s we compare a fingerprint of live sessions/devices; every ~10s we do a full
+    // re-enumeration regardless, so apps that start/stop audio show up without the user opening "Choose…".
+    const int FingerprintCheckEveryTicks = 25;
+    const int FullRefreshEveryTicks = 84;
+    const long UserInteractionQuietTicks = TimeSpan.TicksPerSecond * 2;
+
     void OnRefreshTimerTick()
     {
         RefreshMixerVolumesFromAudio();
 
-        if (++_refreshTickCount % 25 == 0)
+        _refreshTickCount++;
+
+        if (_refreshTickCount % FullRefreshEveryTicks == 0)
+        {
+            if (!UserRecentlyInteractedWithMixer())
+                RefreshAudioDevicesAndApps();
+            return;
+        }
+
+        if (_refreshTickCount % FingerprintCheckEveryTicks == 0)
             CheckForSessionListChanges();
+    }
+
+    bool UserRecentlyInteractedWithMixer()
+    {
+        long now = DateTime.UtcNow.Ticks;
+        foreach (var ch in MasterMixerRows)
+            if (now - ch.LastUserInteractionTicks < UserInteractionQuietTicks) return true;
+        foreach (var ch in AppMixerRows)
+            if (now - ch.LastUserInteractionTicks < UserInteractionQuietTicks) return true;
+        return false;
     }
 
     void SnapshotSessionCount()
@@ -416,27 +465,27 @@ public sealed partial class MainWindow : Window
             foreach (var a in d.AudioApps)
                 count += a.Sessions.Count;
         _lastKnownSessionCount = count;
+
+        try { _lastSessionFingerprint = Audio.GetSessionFingerprint(audioDevices.Select(d => d.MMDevice)); }
+        catch { _lastSessionFingerprint = ""; }
     }
+
+    string _lastSessionFingerprint = "";
 
     void CheckForSessionListChanges()
     {
         try
         {
-            int count = 0;
-            foreach (var d in audioDevices)
-            {
-                try
-                {
-                    var sessions = d.MMDevice.AudioSessionManager.Sessions;
-                    count += sessions.Count;
-                }
-                catch { }
-            }
+            // Enumerate fresh so newly plugged-in devices are part of the comparison too.
+            var enumerator = new MMDeviceEnumerator();
+            var live = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+            string fingerprint = Audio.GetSessionFingerprint(live.Cast<MMDevice>());
 
-            if (count != _lastKnownSessionCount)
+            if (!string.Equals(fingerprint, _lastSessionFingerprint, StringComparison.Ordinal))
             {
-                _lastKnownSessionCount = count;
-                RefreshAudioDevicesAndApps();
+                _lastSessionFingerprint = fingerprint;
+                if (!UserRecentlyInteractedWithMixer())
+                    RefreshAudioDevicesAndApps();
             }
         }
         catch { }
@@ -476,6 +525,8 @@ public sealed partial class MainWindow : Window
         var master = new MixerChannelViewModel(true, "Volume", null, null, device.MMDevice);
         try { master.SyncVolumeFromAudio(device.MMDevice.AudioEndpointVolume.MasterVolumeLevelScalar); }
         catch { }
+        try { master.SyncMuteFromAudio(device.MMDevice.AudioEndpointVolume.Mute); }
+        catch { }
         master.IsHotkeyTarget = currentConfig.ControlDeviceMasterVolume;
         MasterMixerRows.Add(master);
 
@@ -511,6 +562,7 @@ public sealed partial class MainWindow : Window
             .Select(ng => ng.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var rows = new List<MixerChannelViewModel>();
         foreach (var group in groups)
         {
             var first = group.First();
@@ -526,9 +578,45 @@ public sealed partial class MainWindow : Window
 
             try { ch.SyncVolumeFromAudio(sessions[0].SimpleAudioVolume.Volume); }
             catch { }
+            SyncMixerMuteFromAudio(ch);
 
-            AppMixerRows.Add(ch);
+            rows.Add(ch);
         }
+
+        // Keep the configured target visible even when it has no active session. This gives the profile a
+        // persistent visual anchor while the rest of the list continues to reflect currently playing apps.
+        if (!currentConfig.ControlDeviceMasterVolume &&
+            currentConfig.HasTarget &&
+            !rows.Any(r => r.IsHotkeyTarget))
+        {
+            string targetName = string.IsNullOrWhiteSpace(currentConfig.AppFriendlyName)
+                ? currentConfig.AppFileName
+                : currentConfig.AppFriendlyName;
+            var targetApp = new AudioApp
+            {
+                DeviceId = device.MMDevice.ID,
+                AppFileName = currentConfig.AppFileName,
+                AppFriendlyName = targetName
+            };
+            var target = new MixerChannelViewModel(
+                false,
+                targetName,
+                ProcessIconHelper.TryGetIconByFriendlyName(audioApps, currentConfig.AppFriendlyName),
+                targetApp,
+                null,
+                detailText: "Not currently active on this output.",
+                sessionsForRow: new(),
+                targetUnavailable: true);
+            target.IsHotkeyTarget = true;
+            AppMixerRows.Add(target);
+        }
+
+        // The profile's current target always floats to the top so the "what am I controlling" answer is
+        // the first thing in the Apps list; everything else keeps the System Sounds-first alphabetical order.
+        foreach (var ch in rows.Where(r => r.IsHotkeyTarget))
+            AppMixerRows.Add(ch);
+        foreach (var ch in rows.Where(r => !r.IsHotkeyTarget))
+            AppMixerRows.Add(ch);
     }
 
     void RefreshMixerVolumesFromAudio()
@@ -547,23 +635,27 @@ public sealed partial class MainWindow : Window
                     try { ch.SyncVolumeFromAudio(ch.Device.AudioEndpointVolume.MasterVolumeLevelScalar); }
                     catch { }
                 }
+
+                SyncMixerMuteFromAudio(ch);
             }
 
             foreach (var ch in AppMixerRows)
             {
-                if ((now - ch.LastUserInteractionTicks) <= SliderCooldownTicks)
-                    continue;
+                if ((now - ch.LastUserInteractionTicks) > SliderCooldownTicks)
+                {
+                    if (ch.SessionsForRow.Count > 0)
+                    {
+                        try { ch.SyncVolumeFromAudio(ch.SessionsForRow[0].SimpleAudioVolume.Volume); }
+                        catch { }
+                    }
+                    else if (ch.App != null && ch.App.Sessions.Count > 0)
+                    {
+                        try { ch.SyncVolumeFromAudio(ch.App.Sessions[0].SimpleAudioVolume.Volume); }
+                        catch { }
+                    }
+                }
 
-                if (ch.SessionsForRow.Count > 0)
-                {
-                    try { ch.SyncVolumeFromAudio(ch.SessionsForRow[0].SimpleAudioVolume.Volume); }
-                    catch { }
-                }
-                else if (ch.App != null && ch.App.Sessions.Count > 0)
-                {
-                    try { ch.SyncVolumeFromAudio(ch.App.Sessions[0].SimpleAudioVolume.Volume); }
-                    catch { }
-                }
+                SyncMixerMuteFromAudio(ch);
             }
         }
         finally { suspendMixerVolumeEvents = false; }
@@ -579,6 +671,98 @@ public sealed partial class MainWindow : Window
         ch.LastUserInteractionTicks = DateTime.UtcNow.Ticks;
         float v = (float)Math.Clamp(e.NewValue / 100.0, 0, 1);
         ApplyMixerChannelVolume(ch, v);
+    }
+
+    void MixerMuteButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.DataContext is not MixerChannelViewModel ch)
+            return;
+
+        if (ch.IsMaster)
+        {
+            if (ch.Device == null)
+                return;
+
+            try
+            {
+                var endpoint = ch.Device.AudioEndpointVolume;
+                endpoint.Mute = !endpoint.Mute;
+                ch.SyncMuteFromAudio(endpoint.Mute);
+            }
+            catch { }
+            return;
+        }
+
+        var sessions = GetMixerRowSessions(ch);
+        if (sessions.Count == 0)
+            return;
+
+        bool anyUnmuted = false;
+        foreach (var session in sessions)
+        {
+            try
+            {
+                if (!session.SimpleAudioVolume.Mute)
+                    anyUnmuted = true;
+            }
+            catch
+            {
+                // Avoid an inconsistent target if any represented session cannot be inspected.
+                return;
+            }
+        }
+
+        bool mute = anyUnmuted;
+        foreach (var session in sessions)
+        {
+            try { session.SimpleAudioVolume.Mute = mute; }
+            catch { }
+        }
+
+        SyncMixerMuteFromAudio(ch);
+    }
+
+    static IReadOnlyList<AudioSessionControl> GetMixerRowSessions(MixerChannelViewModel ch)
+    {
+        if (ch.SessionsForRow.Count > 0)
+            return ch.SessionsForRow;
+        if (ch.App != null)
+            return ch.App.Sessions;
+        return Array.Empty<AudioSessionControl>();
+    }
+
+    static void SyncMixerMuteFromAudio(MixerChannelViewModel ch)
+    {
+        if (ch.IsMaster)
+        {
+            if (ch.Device == null)
+                return;
+
+            try { ch.SyncMuteFromAudio(ch.Device.AudioEndpointVolume.Mute); }
+            catch { }
+            return;
+        }
+
+        var sessions = GetMixerRowSessions(ch);
+        if (sessions.Count == 0)
+            return;
+
+        bool allMuted = true;
+        foreach (var session in sessions)
+        {
+            try
+            {
+                if (!session.SimpleAudioVolume.Mute)
+                    allMuted = false;
+            }
+            catch
+            {
+                // Keep the last known state when a session disappears during a refresh.
+                return;
+            }
+        }
+
+        ch.SyncMuteFromAudio(allMuted);
     }
 
     static void ApplyMixerChannelVolume(MixerChannelViewModel ch, float scalar)
@@ -601,19 +785,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    void MixerUseForProfile_OnClick(object sender, RoutedEventArgs e)
+    void MixerTargetRadio_OnClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement fe || fe.Tag is not MixerChannelViewModel ch || ch.App == null)
             return;
 
+        currentConfig.ControlDeviceMasterVolume = false;
         currentConfig.AppFileName = ch.App.AppFileName;
         currentConfig.AppFriendlyName = ch.App.AppFriendlyName;
         currentConfig.ProcessIndex = 0;
         currentConfig.SaveConfig();
+        RebuildSessionCache();
         UpdateTargetAppDisplay();
         PopulateProcessControls();
         UpdateConfigComboItemAtSelectedIndex();
-        UpdateConfigDisplayNamePlaceholder();
+        RebuildMixerStrip();
         RecomputeMixerHotkeyHighlights();
     }
 
@@ -623,7 +809,8 @@ public sealed partial class MainWindow : Window
             ch.IsHotkeyTarget = currentConfig.ControlDeviceMasterVolume;
 
         foreach (var ch in AppMixerRows)
-            ch.IsHotkeyTarget = ch.App != null && Audio.AudioAppMatchesConfigOnDevice(ch.App, currentConfig);
+            ch.IsHotkeyTarget = ch.IsTargetUnavailable ||
+                                (ch.App != null && Audio.AudioAppMatchesConfigOnDevice(ch.App, currentConfig));
     }
 
     // ──────────────────── Config / form ────────────────────
@@ -634,7 +821,6 @@ public sealed partial class MainWindow : Window
         UpdateTargetAppDisplay();
         PopulateHotkeys();
         PopulateProcessControls();
-        PopulateConfigDisplayNameControl();
         ApplyVolumeTargetUi();
         RebuildMixerStrip();
         RecomputeMixerHotkeyHighlights();
@@ -658,7 +844,7 @@ public sealed partial class MainWindow : Window
         var next = new Dictionary<Guid, List<AudioSessionControl>>();
         foreach (var config in configs)
         {
-            if (config.ControlDeviceMasterVolume)
+            if (config.ControlDeviceMasterVolume || !config.HasTarget)
                 next[config.ConfigId] = new List<AudioSessionControl>();
             else
             {
@@ -674,6 +860,9 @@ public sealed partial class MainWindow : Window
 
     List<(AudioSessionControl session, string deviceName)> CollectAllMatchingSessionsAcrossDevices(Config config)
     {
+        if (config.ControlDeviceMasterVolume || !config.HasTarget)
+            return new List<(AudioSessionControl session, string deviceName)>();
+
         var result = new List<(AudioSessionControl, string)>();
         foreach (var ad in audioDevices)
         {
@@ -700,7 +889,7 @@ public sealed partial class MainWindow : Window
 
     void RefreshSessionPickerFromAudio()
     {
-        if (currentConfig.ControlDeviceMasterVolume)
+        if (currentConfig.ControlDeviceMasterVolume || !currentConfig.HasTarget)
         {
             suspendSessionPickerEvents = true;
             try
@@ -742,34 +931,108 @@ public sealed partial class MainWindow : Window
         finally { suspendSessionPickerEvents = false; }
     }
 
-    async void ShowMissingAudioDevicesWarningIfNeeded()
+    /// <summary>
+    /// Windows can hand out a new endpoint ID for the same physical device (driver update, USB re-enumeration).
+    /// Re-bind any profile whose stored ID is gone but whose stored device friendly name still exists.
+    /// Returns true if any config changed.
+    /// </summary>
+    bool ReconcileConfigDevices()
     {
-        if (UiGoldenCapture.Enabled || configs.Length == 0)
-            return;
+        if (audioDevices.Length == 0 || configs.Length == 0)
+            return false;
 
-        var validIds = new HashSet<string>(
-            audioDevices.Select(d => d.MMDevice.ID),
-            StringComparer.OrdinalIgnoreCase);
+        var live = audioDevices
+            .Select(d => Audio.TryGetDeviceIdentity(d.MMDevice))
+            .Where(d => d != null)
+            .Select(d => d!)
+            .ToList();
+        if (live.Count == 0)
+            return false;
 
-        var missing = configs.Where(c => !validIds.Contains(c.DeviceId)).ToList();
-        if (missing.Count == 0)
-            return;
+        DeviceIdentity? fallback = null;
+        var rebound = new List<(string profile, string device)>();
 
-        var message = new StringBuilder();
-        message.AppendLine("Some configurations reference an audio output device that is not available (disconnected, disabled, or removed).");
-        message.AppendLine("Choose a device from the list for each affected configuration, or reconnect the device.");
-        message.AppendLine();
-
-        foreach (var group in missing.GroupBy(c => c.DeviceId))
+        bool anyChanged = false;
+        foreach (var config in configs)
         {
-            message.AppendLine("Device ID:");
-            message.AppendLine(group.Key);
-            foreach (var c in group)
-                message.AppendLine($"  • {GetConfigListDisplayName(c)}");
-            message.AppendLine();
+            try
+            {
+                var result = config.TryReconcileDevice(live);
+                switch (result)
+                {
+                    case DeviceReconcileResult.Backfilled:
+                    case DeviceReconcileResult.Rematched:
+                        config.SaveConfig();
+                        anyChanged = true;
+                        break;
+
+                    case DeviceReconcileResult.Orphaned:
+                        // Nothing to match on (profile saved by an older build, device gone). Rather than leave a
+                        // dead profile behind a modal, bind it to the default output and tell the user via InfoBar.
+                        fallback ??= PickFallbackDevice(live);
+                        config.SetDevice(fallback.Id, fallback.FriendlyName, fallback.Description);
+                        config.SaveConfig();
+                        rebound.Add((GetConfigListDisplayName(config), fallback.FriendlyName));
+                        anyChanged = true;
+                        break;
+                }
+            }
+            catch { }
         }
 
-        await ShowMessageAsync(message.ToString().TrimEnd(), "Audio device not found");
+        if (rebound.Count > 0)
+            _pendingRebindNotice = BuildRebindNotice(rebound);
+
+        return anyChanged;
+    }
+
+    /// <summary>Default multimedia render endpoint if it's in the live list, otherwise the first live device.</summary>
+    static DeviceIdentity PickFallbackDevice(List<DeviceIdentity> live)
+    {
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            using var def = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var match = live.FirstOrDefault(d => string.Equals(d.Id, def.ID, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+                return match;
+        }
+        catch { }
+        return live[0];
+    }
+
+    static string BuildRebindNotice(List<(string profile, string device)> rebound)
+    {
+        var byDevice = rebound.GroupBy(r => r.device).ToList();
+        var sb = new StringBuilder();
+        foreach (var g in byDevice)
+        {
+            var names = g.Select(r => r.profile).Distinct().ToList();
+            string list = names.Count switch
+            {
+                1 => names[0],
+                2 => $"{names[0]} and {names[1]}",
+                _ => string.Join(", ", names.Take(names.Count - 1)) + $", and {names[^1]}"
+            };
+            string verb = names.Count == 1 ? "was" : "were";
+            sb.Append($"{list} {verb} re-bound to {g.Key} because the original output device no longer exists. ");
+        }
+        sb.Append("If that's wrong, select the profile and pick a different Output device.");
+        return sb.ToString();
+    }
+
+    string? _pendingRebindNotice;
+
+    /// <summary>Shows any queued auto-rebind message in the non-blocking InfoBar at the top of the window.</summary>
+    void ShowDeviceRebindNoticeIfNeeded()
+    {
+        if (UiGoldenCapture.Enabled || string.IsNullOrEmpty(_pendingRebindNotice))
+            return;
+
+        InfoBarDeviceRebind.Title = "Profiles re-bound to a different output device";
+        InfoBarDeviceRebind.Message = _pendingRebindNotice;
+        InfoBarDeviceRebind.IsOpen = true;
+        _pendingRebindNotice = null;
     }
 
     async void ShowConfigLoadErrorIfNeeded()
@@ -794,21 +1057,7 @@ public sealed partial class MainWindow : Window
         await dialog.ShowAsync();
     }
 
-    // ──────────────────── Profile display name ────────────────────
-
-    void PopulateConfigDisplayNameControl()
-    {
-        TextBoxConfigDisplayName.Text = currentConfig.CustomDisplayName ?? "";
-        UpdateConfigDisplayNamePlaceholder();
-    }
-
-    void UpdateConfigDisplayNamePlaceholder()
-    {
-        ToolTipService.SetToolTip(TextBoxConfigDisplayName,
-            string.IsNullOrWhiteSpace(currentConfig.CustomDisplayName)
-                ? $"Automatic name: {currentConfig.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(currentConfig))}"
-                : "Leave blank to use the automatic name (app + hotkeys + device).");
-    }
+    // ──────────────────── Profile name ────────────────────
 
     void UpdateConfigComboItemAtSelectedIndex()
     {
@@ -829,29 +1078,45 @@ public sealed partial class MainWindow : Window
             ComboBoxConfig.SelectedIndex = sel;
     }
 
-    void TextBoxConfigDisplayName_OnLostFocus(object sender, RoutedEventArgs e)
+    async void ButtonRenameConfig_OnClick(object sender, RoutedEventArgs e)
     {
         if (UiGoldenCapture.Enabled || ComboBoxConfig.SelectedIndex < 0)
             return;
 
-        string trimmed = TextBoxConfigDisplayName.Text.Trim();
+        var textBox = new TextBox
+        {
+            PlaceholderText = currentConfig.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(currentConfig)),
+            Text = currentConfig.CustomDisplayName ?? ""
+        };
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Give this profile a custom name. Leave it blank to use the automatic name.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        panel.Children.Add(textBox);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Rename profile",
+            Content = panel,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            return;
+
+        string trimmed = textBox.Text.Trim();
         string auto = currentConfig.GetAutoDisplayName(GetDeviceFriendlyNameForConfig(currentConfig));
         if (string.IsNullOrEmpty(trimmed) || string.Equals(trimmed, auto, StringComparison.OrdinalIgnoreCase))
             currentConfig.CustomDisplayName = null;
         else
             currentConfig.CustomDisplayName = trimmed;
 
-        TextBoxConfigDisplayName.Text = currentConfig.CustomDisplayName ?? "";
         currentConfig.SaveConfig();
-        UpdateConfigComboItemAtSelectedIndex();
-        UpdateConfigDisplayNamePlaceholder();
-    }
-
-    void ButtonResetDisplayName_OnClick(object sender, RoutedEventArgs e)
-    {
-        currentConfig.CustomDisplayName = null;
-        currentConfig.SaveConfig();
-        PopulateConfigDisplayNameControl();
         UpdateConfigComboItemAtSelectedIndex();
     }
 
@@ -919,16 +1184,30 @@ public sealed partial class MainWindow : Window
         {
             TextAppTarget.Text = "Device master volume";
             ImageAppTarget.Source = null;
+            IconDeviceMasterTarget.Visibility = Visibility.Visible;
+        }
+        else if (!currentConfig.HasTarget)
+        {
+            TextAppTarget.Text = "Choose an app or device master volume";
+            ImageAppTarget.Source = null;
+            IconDeviceMasterTarget.Visibility = Visibility.Collapsed;
         }
         else
         {
-            TextAppTarget.Text = currentConfig.AppFriendlyName;
+            TextAppTarget.Text = string.IsNullOrWhiteSpace(currentConfig.AppFriendlyName)
+                ? currentConfig.AppFileName
+                : currentConfig.AppFriendlyName;
             ImageAppTarget.Source = ProcessIconHelper.TryGetIconByFriendlyName(audioApps, currentConfig.AppFriendlyName);
+            IconDeviceMasterTarget.Visibility = Visibility.Collapsed;
         }
     }
 
-    void PopulateHotkeys() =>
+    void PopulateHotkeys()
+    {
         TextBoxHotkeys.Text = string.Join(" + ", currentConfig.Hotkeys.Select(KeyDisplayNames.GetDisplayName));
+        ButtonHotkeyAdd.IsEnabled = currentConfig.HasTarget;
+        ButtonHotkeyReset.IsEnabled = currentConfig.HasTarget || currentConfig.Hotkeys.Length > 0;
+    }
 
     void PopulateProcessControls()
     {
@@ -938,9 +1217,12 @@ public sealed partial class MainWindow : Window
 
     void ApplyVolumeTargetUi()
     {
-        bool appMode = !currentConfig.ControlDeviceMasterVolume;
+        bool hasTarget = currentConfig.HasTarget;
+        bool appMode = hasTarget && !currentConfig.ControlDeviceMasterVolume;
         CheckBoxSingleSession.IsEnabled = appMode;
         LabelSession.Opacity = appMode ? 1 : 0.45;
+        ButtonHotkeyAdd.IsEnabled = hasTarget;
+        ButtonHotkeyReset.IsEnabled = hasTarget || currentConfig.Hotkeys.Length > 0;
 
         if (!appMode)
         {
@@ -966,7 +1248,6 @@ public sealed partial class MainWindow : Window
         UpdateTargetAppDisplay();
         ApplyVolumeTargetUi();
         UpdateConfigComboItemAtSelectedIndex();
-        UpdateConfigDisplayNamePlaceholder();
         RebuildMixerStrip();
         RecomputeMixerHotkeyHighlights();
     }
@@ -988,11 +1269,11 @@ public sealed partial class MainWindow : Window
             return;
         if (ComboBoxDevice.SelectedIndex < 0 || ComboBoxDevice.SelectedIndex >= audioDevices.Length)
             return;
-        currentConfig.DeviceId = audioDevices[ComboBoxDevice.SelectedIndex].MMDevice.ID;
+        var picked = audioDevices[ComboBoxDevice.SelectedIndex].MMDevice;
+        currentConfig.SetDevice(picked.ID, picked.FriendlyName, Audio.TryGetDeviceDescription(picked));
         currentConfig.SaveConfig();
         RefreshSessionPickerFromAudio();
         UpdateConfigComboItemAtSelectedIndex();
-        UpdateConfigDisplayNamePlaceholder();
         RebuildMixerStrip();
         RecomputeMixerHotkeyHighlights();
     }
@@ -1008,12 +1289,11 @@ public sealed partial class MainWindow : Window
 
     void ButtonHotkeyReset_OnClick(object sender, RoutedEventArgs e)
     {
-        hotkeysToListenFor = Array.Empty<int>();
-        TextBoxHotkeys.Text = "";
-        currentConfig.Hotkeys = hotkeysToListenFor;
+        currentConfig.Hotkeys = Array.Empty<int>();
         currentConfig.SaveConfig();
+        UpdateHotkeysToListenFor();
+        PopulateHotkeys();
         UpdateConfigComboItemAtSelectedIndex();
-        UpdateConfigDisplayNamePlaceholder();
     }
 
     void AddHotkey(int virtualKey)
@@ -1037,7 +1317,6 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(() =>
             {
                 UpdateConfigComboItemAtSelectedIndex();
-                UpdateConfigDisplayNamePlaceholder();
             });
         }
         else
@@ -1075,15 +1354,18 @@ public sealed partial class MainWindow : Window
 
     void ButtonNewConfig_OnClick(object sender, RoutedEventArgs e)
     {
-        if (audioDevices.Length == 0)
+        var device = GetPreferredAudioDevice();
+        if (device == null)
             return;
 
         var newConfig = new Config
         {
             ConfigId = Guid.NewGuid(),
-            DeviceId = audioDevices[0].MMDevice.ID,
-            AppFileName = "%b#",
-            AppFriendlyName = "System Sounds",
+            DeviceId = device.MMDevice.ID,
+            DeviceFriendlyName = device.MMDevice.FriendlyName,
+            DeviceDescription = Audio.TryGetDeviceDescription(device.MMDevice),
+            AppFileName = "",
+            AppFriendlyName = "",
             Hotkeys = Array.Empty<int>(),
             ControlSingleSession = false,
             ProcessIndex = 0,
@@ -1094,6 +1376,22 @@ public sealed partial class MainWindow : Window
         newConfig.SaveConfig();
         PopulateConfigs(configs.Length - 1);
         LoadConfigToForm();
+    }
+
+    AudioDevice? GetPreferredAudioDevice()
+    {
+        try
+        {
+            var enumerator = new MMDeviceEnumerator();
+            var defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var matching = audioDevices.FirstOrDefault(d =>
+                string.Equals(d.MMDevice.ID, defaultDevice.ID, StringComparison.OrdinalIgnoreCase));
+            if (matching != null)
+                return matching;
+        }
+        catch { }
+
+        return audioDevices.FirstOrDefault();
     }
 
     async void ButtonDeleteConfig_OnClick(object sender, RoutedEventArgs e)
@@ -1121,6 +1419,11 @@ public sealed partial class MainWindow : Window
             audioAppsList.AddRange(Audio.GetAudioDeviceApps(device.MMDevice));
         audioApps = audioAppsList.ToArray();
 
+        // A device that was missing at startup may have come back under a new ID.
+        ReconcileConfigDevices();
+        if (_pendingRebindNotice != null)
+            DispatcherQueue.TryEnqueue(ShowDeviceRebindNoticeIfNeeded);
+
         RebuildSessionCache();
         SnapshotSessionCount();
         DispatcherQueue.TryEnqueue(() =>
@@ -1129,7 +1432,6 @@ public sealed partial class MainWindow : Window
             PopulateProcessControls();
             ApplyVolumeTargetUi();
             RefreshAllConfigComboItemTexts();
-            UpdateConfigDisplayNamePlaceholder();
             RebuildMixerStrip();
             RecomputeMixerHotkeyHighlights();
         });
@@ -1146,6 +1448,20 @@ public sealed partial class MainWindow : Window
             Content.XamlRoot, audioApps, currentConfig.AppFriendlyName, currentConfig.ControlDeviceMasterVolume);
         if (result is null)
             return;
+
+        if (result == AppSelectionDialog.NoTargetResult)
+        {
+            currentConfig.ControlDeviceMasterVolume = false;
+            currentConfig.AppFileName = "";
+            currentConfig.AppFriendlyName = "";
+            currentConfig.Hotkeys = Array.Empty<int>();
+            currentConfig.ControlSingleSession = false;
+            currentConfig.ProcessIndex = 0;
+            ApplyDeviceMasterChange();
+            UpdateHotkeysToListenFor();
+            PopulateHotkeys();
+            return;
+        }
 
         if (result == AppSelectionDialog.DeviceMasterResult)
         {
@@ -1239,12 +1555,35 @@ public sealed partial class MainWindow : Window
         try { checkBox.IsChecked = StartupRegistration.IsRegisteredForCurrentExe(); }
         catch { }
 
+        var versionText = new TextBlock
+        {
+            Text = $"KBMixer {typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "?"}",
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var checkUpdatesButton = new Button { Content = "Check for updates" };
+
+        var updateRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        updateRow.Children.Add(checkUpdatesButton);
+        updateRow.Children.Add(versionText);
+
+        var settingsPanel = new StackPanel { Spacing = 16 };
+        settingsPanel.Children.Add(checkBox);
+        settingsPanel.Children.Add(updateRow);
+
         var dialog = new ContentDialog
         {
             Title = "Settings",
-            Content = checkBox,
+            Content = settingsPanel,
             CloseButtonText = "Close",
             XamlRoot = Content.XamlRoot
+        };
+
+        checkUpdatesButton.Click += async (_, _) =>
+        {
+            // Only one ContentDialog can be open at a time in WinUI; close Settings before prompting.
+            dialog.Hide();
+            await UpdateChecker.CheckAndPromptAsync(Content.XamlRoot, silentIfUpToDate: false);
         };
 
         checkBox.Checked += async (_, _) =>

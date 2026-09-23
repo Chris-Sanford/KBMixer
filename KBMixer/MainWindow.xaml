@@ -19,7 +19,8 @@
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="ContentPanel" Padding="36,8,36,36">
+            <!-- Content column is capped and centered so a maximized window doesn't stretch controls apart -->
+            <StackPanel x:Name="ContentPanel" Padding="36,8,36,36" MaxWidth="900" HorizontalAlignment="Stretch">
 
                 <!-- Title row with help and settings buttons -->
                 <Grid Margin="0,0,0,4">
@@ -45,146 +46,17 @@
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            Text="Control per-app and system-wide volume levels using your mouse scroll wheel and custom hotkeys from anywhere."/>
 
-                <!-- System / Mixer card -->
-                <Border Style="{StaticResource UiCard}" Margin="0,0,0,14" Padding="20,18,20,14">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="System" Margin="0,0,0,10"/>
-
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Output device" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="ComboBoxDevice" HorizontalAlignment="Stretch" Margin="0,0,0,14"
-                                  SelectionChanged="ComboBoxDevice_OnSelectionChanged"/>
-
-                        <!-- Master volume + app rows share identical column layout for alignment -->
-                        <ItemsControl x:Name="MasterMixerItems">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel>
-                                        <Grid MinHeight="44">
-                                            <Border Background="{ThemeResource HighlightRowBrush}" CornerRadius="4"
-                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
-                                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="2"
-                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
-
-                                            <Grid Padding="8,8" ColumnSpacing="8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="36"/>
-                                                    <ColumnDefinition Width="140"/>
-                                                    <ColumnDefinition Width="24"/>
-                                                    <ColumnDefinition Width="40"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="36"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <FontIcon Grid.Column="0" Glyph="&#xE995;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16"
-                                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"
-                                                          HorizontalAlignment="Center"/>
-
-                                                <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
-                                                           Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
-
-                                                <TextBlock Grid.Column="3" Text="{Binding VolumePercentText}"
-                                                           Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center"
-                                                           HorizontalAlignment="Right"/>
-
-                                                <Slider Grid.Column="4" VerticalAlignment="Center"
-                                                        Minimum="0" Maximum="100" StepFrequency="1" SnapsTo="StepValues"
-                                                        Value="{Binding VolumePercent, Mode=TwoWay}"
-                                                        ValueChanged="MixerSlider_OnValueChanged"/>
-                                            </Grid>
-                                        </Grid>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Apps" Margin="0,14,0,8"/>
-
-                        <ItemsControl x:Name="AppMixerItems">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel>
-                                        <Grid MinHeight="44">
-                                            <Border Background="{ThemeResource HighlightRowBrush}" CornerRadius="4"
-                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
-                                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="2"
-                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
-
-                                            <Grid Padding="8,8" ColumnSpacing="8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="36"/>
-                                                    <ColumnDefinition Width="140"/>
-                                                    <ColumnDefinition Width="24"/>
-                                                    <ColumnDefinition Width="40"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="36"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <Grid Grid.Column="0" Width="28" Height="28" VerticalAlignment="Center"
-                                                      HorizontalAlignment="Center">
-                                                    <Image Source="{Binding Icon}" Width="28" Height="28" Stretch="Uniform"
-                                                           Visibility="{Binding ShowAppIcon, Converter={StaticResource BoolToVis}}"/>
-                                                    <FontIcon Glyph="&#xE8D6;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
-                                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                              Visibility="{Binding ShowFallbackIcon, Converter={StaticResource BoolToVis}}"/>
-                                                </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">
-                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding DetailText}" Style="{StaticResource CaptionTextBlockStyle}"
-                                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis"
-                                                               Visibility="{Binding ShowDetailText, Converter={StaticResource BoolToVis}}"/>
-                                                </StackPanel>
-
-                                                <FontIcon Grid.Column="2" Glyph="&#xE995;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
-                                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center"
-                                                          HorizontalAlignment="Center"
-                                                          ToolTipService.ToolTip="Output level"/>
-
-                                                <TextBlock Grid.Column="3" Text="{Binding VolumePercentText}"
-                                                           Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center"
-                                                           HorizontalAlignment="Right"/>
-
-                                                <Slider Grid.Column="4" VerticalAlignment="Center"
-                                                        Minimum="0" Maximum="100" StepFrequency="1" SnapsTo="StepValues"
-                                                        Value="{Binding VolumePercent, Mode=TwoWay}"
-                                                        ValueChanged="MixerSlider_OnValueChanged"/>
-
-                                                <ToggleButton Grid.Column="5" Style="{StaticResource ChevronToggle}"
-                                                              VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                              IsChecked="{Binding IsRowExpanded, Mode=TwoWay}"
-                                                              Visibility="{Binding ShowChevron, Converter={StaticResource BoolToVis}}">
-                                                    <FontIcon Glyph="{Binding IsRowExpanded, Converter={StaticResource BoolToChevron}}"
-                                                              FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="12"/>
-                                                </ToggleButton>
-                                            </Grid>
-                                        </Grid>
-
-                                        <!-- Expanded panel -->
-                                        <StackPanel Visibility="{Binding ShowExpandedPanel, Converter={StaticResource BoolToVis}}"
-                                                    Padding="52,0,44,12">
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,0,0,8"
-                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                       Text="KBMixer: bind this app to the current profile's hotkeys."/>
-                                            <HyperlinkButton Content="Set as profile target"
-                                                             Click="MixerUseForProfile_OnClick" Tag="{Binding}"
-                                                             Visibility="{Binding ShowSetTargetButton, Converter={StaticResource BoolToVis}}"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
+                <!-- Non-blocking notice when profiles were auto re-bound to a different output device -->
+                <InfoBar x:Name="InfoBarDeviceRebind" IsOpen="False" IsClosable="True"
+                         Severity="Informational" Margin="0,0,0,14"/>
 
                 <!-- Profile and hotkeys card -->
                 <Border Style="{StaticResource UiCard}" Margin="0,0,0,14">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Profile &amp; hotkeys" Margin="0,0,0,2"/>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Profile" Margin="0,0,0,2"/>
                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Margin="0,0,0,16"
                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                   Text="Profiles store device, target app, and hotkeys."/>
+                                   Text="Start at the top and work down: each profile stores its output, target, and controls."/>
 
                         <Grid ColumnSpacing="12" RowSpacing="12">
                             <Grid.ColumnDefinitions>
@@ -209,40 +81,47 @@
                             <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="8">
                                 <Button x:Name="ButtonNewConfig" Content="New" MinWidth="72" Padding="14,7"
                                         Click="ButtonNewConfig_OnClick"/>
+                                <Button x:Name="ButtonRenameConfig" Content="Rename" MinWidth="82" Padding="14,7"
+                                        Click="ButtonRenameConfig_OnClick"/>
                                 <Button x:Name="ButtonDeleteConfig" Content="Delete" MinWidth="72" Padding="14,7"
                                         Click="ButtonDeleteConfig_OnClick"/>
                             </StackPanel>
 
-                            <!-- Row 1: Display name -->
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Display name" VerticalAlignment="Center"
+                            <!-- Row 1: Output device -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Output device" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <TextBox x:Name="TextBoxConfigDisplayName" Grid.Row="1" Grid.Column="1"
-                                     ToolTipService.ToolTip="Leave blank to use the automatic name (app + hotkeys + device)."
-                                     LostFocus="TextBoxConfigDisplayName_OnLostFocus"/>
-                            <Button x:Name="ButtonResetDisplayName" Grid.Row="1" Grid.Column="2" Content="Reset"
-                                    MinWidth="72" Padding="14,7" Click="ButtonResetDisplayName_OnClick"/>
+                            <ComboBox x:Name="ComboBoxDevice" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="ComboBoxDevice_OnSelectionChanged"/>
 
-                            <!-- Row 2: Hotkeys -->
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Hotkeys" VerticalAlignment="Center"
+                            <!-- Row 2: Target (what the profile controls) -->
+                            <TextBlock x:Name="LabelApp" Grid.Row="2" Grid.Column="0" Text="Target" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <TextBox x:Name="TextBoxHotkeys" Grid.Row="2" Grid.Column="1" IsReadOnly="True"/>
-                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Grid Width="20" Height="20">
+                                    <Image x:Name="ImageAppTarget" Width="20" Height="20" Stretch="Uniform"/>
+                                    <FontIcon x:Name="IconDeviceMasterTarget" Glyph="&#xE995;"
+                                              FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16"
+                                              Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Visibility="Collapsed"/>
+                                </Grid>
+                                <TextBlock x:Name="TextAppTarget" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextBlockStyle}"/>
+                            </StackPanel>
+                            <Button x:Name="ButtonAppChoose" Grid.Row="2" Grid.Column="2" Content="Choose…"
+                                    MinWidth="72" Padding="14,7" Click="ButtonAppChoose_OnClick"/>
+
+                            <!-- Row 3: Hotkeys (how the target is controlled) -->
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Hotkeys" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBox x:Name="TextBoxHotkeys" Grid.Row="3" Grid.Column="1" IsReadOnly="True"/>
+                            <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Spacing="8">
                                 <Button x:Name="ButtonHotkeyAdd" Content="Add" MinWidth="72" Padding="14,7"
                                         Click="ButtonHotkeyAdd_OnClick"/>
                                 <Button x:Name="ButtonHotkeyReset" Content="Reset" MinWidth="72" Padding="14,7"
                                         Click="ButtonHotkeyReset_OnClick"/>
                             </StackPanel>
-
-                            <!-- Row 3: Target -->
-                            <TextBlock x:Name="LabelApp" Grid.Row="3" Grid.Column="0" Text="Target" VerticalAlignment="Center"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Image x:Name="ImageAppTarget" Width="20" Height="20" Stretch="Uniform"/>
-                                <TextBlock x:Name="TextAppTarget" VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextBlockStyle}"/>
-                            </StackPanel>
-                            <Button x:Name="ButtonAppChoose" Grid.Row="3" Grid.Column="2" Content="Choose…"
-                                    MinWidth="72" Padding="14,7" Click="ButtonAppChoose_OnClick"/>
 
                             <!-- Row 4: Session -->
                             <TextBlock x:Name="LabelSession" Grid.Row="4" Grid.Column="0" Text="Session" VerticalAlignment="Center"
@@ -257,6 +136,146 @@
                                       SelectionChanged="ComboBoxAudioSession_OnSelectionChanged"
                                       DropDownOpened="ComboBoxAudioSession_OnDropDownOpened"/>
                         </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- System / Mixer card -->
+                <Border Style="{StaticResource UiCard}" Margin="0,0,0,14" Padding="20,18,20,14">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Mixer" Margin="0,0,0,10"/>
+
+                        <!-- Master volume + app rows share identical column layout for alignment -->
+                        <ItemsControl x:Name="MasterMixerItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <Grid MinHeight="44">
+                                            <Border Background="{ThemeResource HighlightRowBrush}" CornerRadius="4"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+                                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="2"
+                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+
+                                            <Grid Padding="8,8" ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="28"/>
+                                                    <ColumnDefinition Width="36"/>
+                                                    <ColumnDefinition Width="140"/>
+                                                    <ColumnDefinition Width="24"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Column 0 is a spacer so the master row lines up with the app rows' chevron column -->
+                                                <Button Grid.Column="1" Width="28" Height="28" MinWidth="0" Padding="0"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        IsEnabled="{Binding IsVolumeControlEnabled}"
+                                                        ToolTipService.ToolTip="{Binding MuteToolTip}"
+                                                        AutomationProperties.Name="{Binding MuteToolTip}"
+                                                        Click="MixerMuteButton_OnClick">
+                                                    <FontIcon Glyph="{Binding MuteGlyph}"
+                                                              FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="18"
+                                                              Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                                </Button>
+
+                                                <TextBlock Grid.Column="2" Text="{Binding Title}" VerticalAlignment="Center"
+                                                           Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+
+                                                <TextBlock Grid.Column="4" Text="{Binding VolumePercentText}"
+                                                           Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right"
+                                                           Opacity="{Binding VolumeControlOpacity}"/>
+
+                                                <Slider Grid.Column="5" VerticalAlignment="Center"
+                                                        HorizontalAlignment="Stretch" MinWidth="160" Margin="0,0,8,0"
+                                                        Minimum="0" Maximum="100" StepFrequency="1" SnapsTo="StepValues"
+                                                        Opacity="{Binding VolumeControlOpacity}"
+                                                        Value="{Binding VolumePercent, Mode=TwoWay}"
+                                                        ValueChanged="MixerSlider_OnValueChanged"/>
+                                            </Grid>
+                                        </Grid>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Apps" Margin="0,14,0,8"/>
+
+                        <ItemsControl x:Name="AppMixerItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <Grid MinHeight="44">
+                                            <Border Background="{ThemeResource HighlightRowBrush}" CornerRadius="4"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+                                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="2"
+                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                    Visibility="{Binding IsHotkeyTarget, Converter={StaticResource BoolToVis}}"/>
+
+                                            <Grid Padding="8,8" ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="28"/>
+                                                    <ColumnDefinition Width="36"/>
+                                                    <ColumnDefinition Width="140"/>
+                                                    <ColumnDefinition Width="24"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Select this app as the current profile target -->
+                                                <RadioButton Grid.Column="0" GroupName="ProfileTarget"
+                                                             VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                             IsChecked="{Binding IsHotkeyTarget, Mode=OneWay}"
+                                                             Click="MixerTargetRadio_OnClick"
+                                                             Tag="{Binding}"
+                                                             ToolTipService.ToolTip="Use this app as the profile target"/>
+
+                                                <Grid Grid.Column="1" Width="28" Height="28" VerticalAlignment="Center"
+                                                      HorizontalAlignment="Center">
+                                                    <Image Source="{Binding Icon}" Width="28" Height="28" Stretch="Uniform"
+                                                           Visibility="{Binding ShowAppIcon, Converter={StaticResource BoolToVis}}"/>
+                                                    <FontIcon Glyph="&#xE8D6;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
+                                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                              Visibility="{Binding ShowFallbackIcon, Converter={StaticResource BoolToVis}}"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="0">
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding DetailText}" Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis"
+                                                               Visibility="{Binding ShowDetailText, Converter={StaticResource BoolToVis}}"/>
+                                                </StackPanel>
+
+                                                <Button Grid.Column="3" Width="24" Height="28" MinWidth="0" Padding="0"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        IsEnabled="{Binding IsVolumeControlEnabled}"
+                                                        ToolTipService.ToolTip="{Binding MuteToolTip}"
+                                                        AutomationProperties.Name="{Binding MuteToolTip}"
+                                                        Click="MixerMuteButton_OnClick">
+                                                    <FontIcon Glyph="{Binding MuteGlyph}"
+                                                              FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="16"
+                                                              Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                                </Button>
+
+                                                <TextBlock Grid.Column="4" Text="{Binding VolumePercentText}"
+                                                           Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right"
+                                                           Opacity="{Binding VolumeControlOpacity}"/>
+
+                                                <Slider Grid.Column="5" VerticalAlignment="Center"
+                                                        HorizontalAlignment="Stretch" MinWidth="160" Margin="0,0,8,0"
+                                                        Minimum="0" Maximum="100" StepFrequency="1" SnapsTo="StepValues"
+                                                        IsEnabled="{Binding IsVolumeControlEnabled}"
+                                                        Opacity="{Binding VolumeControlOpacity}"
+                                                        Value="{Binding VolumePercent, Mode=TwoWay}"
+                                                        ValueChanged="MixerSlider_OnValueChanged"/>
+                                            </Grid>
+                                        </Grid>
+
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
             </StackPanel>

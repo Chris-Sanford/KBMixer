@@ -9,14 +9,15 @@ namespace KBMixer;
 public sealed class MixerChannelViewModel : INotifyPropertyChanged
 {
     float _volumeScalar;
+    bool _isMuted;
     bool _isHotkeyTarget;
-    bool _isRowExpanded;
 
     public MixerChannelViewModel(
         bool isMaster, string title, ImageSource? icon,
         AudioApp? app, MMDevice? device,
         string? detailText = null,
-        List<AudioSessionControl>? sessionsForRow = null)
+        List<AudioSessionControl>? sessionsForRow = null,
+        bool targetUnavailable = false)
     {
         IsMaster = isMaster;
         Title = title;
@@ -25,6 +26,7 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
         App = app;
         Device = device;
         SessionsForRow = sessionsForRow ?? new();
+        IsTargetUnavailable = targetUnavailable;
     }
 
     public bool IsMaster { get; }
@@ -34,24 +36,10 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
     public AudioApp? App { get; }
     public MMDevice? Device { get; }
     public List<AudioSessionControl> SessionsForRow { get; }
+    public bool IsTargetUnavailable { get; }
 
     /// <summary>Tracks when the user last interacted with this row's slider to suppress sync.</summary>
     internal long LastUserInteractionTicks { get; set; }
-
-    public bool IsExpandable => !IsMaster;
-
-    public bool IsRowExpanded
-    {
-        get => _isRowExpanded;
-        set
-        {
-            if (_isRowExpanded == value)
-                return;
-            _isRowExpanded = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(ShowExpandedPanel));
-        }
-    }
 
     public bool IsHotkeyTarget
     {
@@ -68,11 +56,20 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
     public bool ShowMasterIcon => IsMaster;
     public bool ShowFallbackIcon => !IsMaster && Icon == null;
     public bool ShowAppIcon => Icon != null;
-    public bool ShowChevron => !IsMaster;
-    public bool ShowExpandedPanel => !IsMaster && IsRowExpanded;
     public bool ShowDetailText => !string.IsNullOrEmpty(DetailText);
     public bool ShowVolumeGlyph => !IsMaster;
-    public bool ShowSetTargetButton => !IsMaster && App != null;
+    public bool IsVolumeControlEnabled =>
+        !IsTargetUnavailable &&
+        (IsMaster ? Device != null : SessionsForRow.Count > 0 || (App?.Sessions.Count ?? 0) > 0);
+
+    public bool IsMuted => _isMuted;
+    public double VolumeControlOpacity => IsMuted ? 0.38 : 1.0;
+    public string MuteGlyph => IsMuted ? "\uE74F" : "\uE995";
+    public string MuteToolTip => !IsVolumeControlEnabled
+        ? "Mute unavailable"
+        : IsMaster
+            ? (IsMuted ? "Unmute" : "Mute")
+            : (IsMuted ? "Unmute all sessions" : "Mute all sessions");
 
     public float VolumeScalar
     {
@@ -111,6 +108,17 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(VolumeScalar));
         OnPropertyChanged(nameof(VolumePercent));
         OnPropertyChanged(nameof(VolumePercentText));
+    }
+
+    public void SyncMuteFromAudio(bool muted)
+    {
+        if (_isMuted == muted)
+            return;
+        _isMuted = muted;
+        OnPropertyChanged(nameof(IsMuted));
+        OnPropertyChanged(nameof(VolumeControlOpacity));
+        OnPropertyChanged(nameof(MuteGlyph));
+        OnPropertyChanged(nameof(MuteToolTip));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

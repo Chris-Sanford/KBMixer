@@ -9,6 +9,7 @@ namespace KBMixer;
 internal static class AppSelectionDialog
 {
     public const string DeviceMasterResult = "\x01DEVICE_MASTER";
+    public const string NoTargetResult = "\x01NO_TARGET";
 
     public static async Task<string?> ShowAsync(
         XamlRoot xamlRoot, AudioApp[] audioApps, string initialFriendlyName, bool isDeviceMaster)
@@ -31,6 +32,11 @@ internal static class AppSelectionDialog
         var radioSelect = new RadioButton
         {
             Content = "Choose from apps currently playing audio on this PC",
+            GroupName = "AppMode"
+        };
+        var radioNoTarget = new RadioButton
+        {
+            Content = "Leave this profile unconfigured for now",
             GroupName = "AppMode"
         };
         var radioManual = new RadioButton
@@ -71,6 +77,11 @@ internal static class AppSelectionDialog
             textBox.Visibility = Visibility.Collapsed;
             contentArea.Visibility = Visibility.Visible;
         };
+        radioNoTarget.Checked += (_, _) =>
+        {
+            mode = 3;
+            contentArea.Visibility = Visibility.Collapsed;
+        };
         radioManual.Checked += (_, _) =>
         {
             mode = 1;
@@ -95,7 +106,13 @@ internal static class AppSelectionDialog
         {
             var match = items.FirstOrDefault(i =>
                 string.Equals(i.DisplayName, initialFriendlyName, StringComparison.OrdinalIgnoreCase));
-            if (match != null)
+            if (string.IsNullOrWhiteSpace(initialFriendlyName))
+            {
+                radioNoTarget.IsChecked = true;
+                mode = 3;
+                contentArea.Visibility = Visibility.Collapsed;
+            }
+            else if (match != null)
             {
                 radioSelect.IsChecked = true;
                 listView.SelectedItem = match;
@@ -118,6 +135,7 @@ internal static class AppSelectionDialog
         };
 
         var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(radioNoTarget);
         panel.Children.Add(radioSelect);
         panel.Children.Add(radioManual);
         panel.Children.Add(radioDeviceMaster);
@@ -140,6 +158,8 @@ internal static class AppSelectionDialog
 
         if (mode == 2)
             return DeviceMasterResult;
+        if (mode == 3)
+            return NoTargetResult;
 
         if (mode == 0)
             return (listView.SelectedItem as AppPickItem)?.DisplayName;

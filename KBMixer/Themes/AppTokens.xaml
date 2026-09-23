@@ -6,7 +6,6 @@
     <!-- Converters -->
     <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
     <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
-    <local:BoolToChevronGlyphConverter x:Key="BoolToChevron"/>
 
     <Style x:Key="UiCard" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
@@ -14,14 +13,6 @@
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="20,18"/>
-    </Style>
-
-    <Style x:Key="ChevronToggle" TargetType="ToggleButton">
-        <Setter Property="Width" Value="36"/>
-        <Setter Property="Height" Value="36"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
 </ResourceDictionary>

@@ -210,7 +210,7 @@ namespace KBMixer
         /// <summary>True when any session in <paramref name="app"/> is the hotkey target described by <paramref name="config"/>.</summary>
         public static bool AudioAppMatchesConfigOnDevice(AudioApp app, Config config)
         {
-            if (config.ControlDeviceMasterVolume)
+            if (config.ControlDeviceMasterVolume || !config.HasTarget)
                 return false;
             if (!string.Equals(app.DeviceId, config.DeviceId, StringComparison.OrdinalIgnoreCase))
                 return false;
@@ -221,6 +221,9 @@ namespace KBMixer
         public static List<AudioSessionControl> CollectSessionsForConfig(MMDevice device, Config config)
         {
             var list = new List<AudioSessionControl>();
+            if (config.ControlDeviceMasterVolume || !config.HasTarget)
+                return list;
+
             var seen = new HashSet<AudioSessionControl>(SessionReferenceEqualityComparer.Instance);
             SessionCollection sessions = device.AudioSessionManager.Sessions;
 
@@ -289,6 +292,70 @@ namespace KBMixer
             string path = Path.Combine(Path.GetTempPath(), "KBMixer-audio-sessions.txt");
             File.WriteAllText(path, sb.ToString());
             return path;
+        }
+
+        /// <summary>
+        /// Cheap, stable fingerprint of "which sessions exist on which devices" (device id + PID + session instance id).
+        /// Used by the refresh timer to detect sessions appearing/disappearing/swapping even when the count is unchanged.
+        /// </summary>
+        public static string GetSessionFingerprint(IEnumerable<MMDevice> devices)
+        {
+            var parts = new List<string>();
+            foreach (var dev in devices)
+            {
+                string devId;
+                try { devId = dev.ID; } catch { continue; }
+                parts.Add(devId);
+
+                SessionCollection sessions;
+                try { sessions = dev.AudioSessionManager.Sessions; }
+                catch { continue; }
+
+                for (int i = 0; i < sessions.Count; i++)
+                {
+                    try
+                    {
+                        var s = sessions[i];
+                        parts.Add($"{devId}|{s.GetProcessID}|{s.GetSessionInstanceIdentifier}");
+                    }
+                    catch { }
+                }
+            }
+            parts.Sort(StringComparer.Ordinal);
+            return string.Join("\n", parts);
+        }
+
+        /// <summary>
+        /// Adapter / device-interface name (e.g. "HyperX Cloud Alpha S Game"). Stable across endpoint-id rotation and
+        /// unaffected by the user renaming the endpoint in Sound settings. Null if unavailable.
+        /// </summary>
+        public static string? TryGetDeviceDescription(MMDevice device)
+        {
+            try
+            {
+                string? s = device.DeviceFriendlyName;
+                return string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Id + friendly name + description for a live endpoint, or null if the device can't be read.</summary>
+        public static DeviceIdentity? TryGetDeviceIdentity(MMDevice device)
+        {
+            try
+            {
+                string id = device.ID;
+                if (string.IsNullOrEmpty(id))
+                    return null;
+                return new DeviceIdentity(id, device.FriendlyName ?? "", TryGetDeviceDescription(device));
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public static AudioDevice[] GetAudioDevices()
@@ -421,9 +488,10 @@ namespace KBMixer
                             return false;
 
                         string display = session.DisplayName ?? "";
-                        appFriendlyName = !string.IsNullOrWhiteSpace(display)
-                            ? display.Trim()
-                            : Path.GetFileNameWithoutExtension(appFileName);
+                        if (!string.IsNullOrWhiteSpace(display) && !LooksLikeResourceReference(display))
+                            appFriendlyName = display.Trim();
+                        else
+                            appFriendlyName = GetFileDescription(exePath) ?? Path.GetFileNameWithoutExtension(appFileName);
                         return true;
                     }
                     catch
@@ -456,6 +524,50 @@ namespace KBMixer
 
             return false;
         }
+
+        private static readonly Dictionary<string, string?> FileDescriptionCache = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Friendly product name from the executable's version resource (e.g. "Google Chrome" for chrome.exe).
+        /// Cached per path because identity resolution runs on a timer.
+        /// </summary>
+        public static string? GetFileDescription(string? exePath)
+        {
+            if (string.IsNullOrEmpty(exePath))
+                return null;
+
+            lock (FileDescriptionCache)
+            {
+                if (FileDescriptionCache.TryGetValue(exePath, out var cached))
+                    return cached;
+            }
+
+            string? result = null;
+            try
+            {
+                if (File.Exists(exePath))
+                {
+                    var info = FileVersionInfo.GetVersionInfo(exePath);
+                    string? desc = info.FileDescription?.Trim();
+                    if (string.IsNullOrWhiteSpace(desc))
+                        desc = info.ProductName?.Trim();
+                    if (!string.IsNullOrWhiteSpace(desc))
+                        result = desc;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GetFileDescription({exePath}): {ex.Message}");
+            }
+
+            lock (FileDescriptionCache)
+                FileDescriptionCache[exePath] = result;
+            return result;
+        }
+
+        /// <summary>Session display names like "@%SystemRoot%\System32\AudioSrv.Dll,-202" are unresolved resource refs.</summary>
+        private static bool LooksLikeResourceReference(string display) =>
+            display.StartsWith("@", StringComparison.Ordinal) && display.Contains(",-", StringComparison.Ordinal);
 
         private static string EnsureExeSuffix(string processName)
         {

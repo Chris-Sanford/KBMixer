@@ -1,9 +1,25 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text;
 
 namespace KBMixer;
+
+/// <summary>Identity of a live render endpoint used to re-bind profiles when endpoint ids rotate.</summary>
+public sealed record DeviceIdentity(string Id, string FriendlyName, string? Description);
+
+public enum DeviceReconcileResult
+{
+    /// <summary>Stored id is live and nothing needed updating.</summary>
+    Unchanged,
+    /// <summary>Stored id is live; missing name/description fields were filled in (save recommended).</summary>
+    Backfilled,
+    /// <summary>Stored id was gone but the same device was found by name/description and re-bound (save required).</summary>
+    Rematched,
+    /// <summary>Stored id is gone and no live device matches; caller should pick a fallback device.</summary>
+    Orphaned
+}
 
 public class Config
 {
@@ -21,8 +37,97 @@ public class Config
     /// <summary>When set, shown in the config list instead of the auto-generated name.</summary>
     public string? CustomDisplayName { get; set; }
 
+    /// <summary>Whether this profile has an app target or is configured to control the device master volume.</summary>
+    [JsonIgnore]
+    public bool HasTarget =>
+        ControlDeviceMasterVolume ||
+        !string.IsNullOrWhiteSpace(AppFileName) ||
+        !string.IsNullOrWhiteSpace(AppFriendlyName);
+
+    /// <summary>
+    /// Friendly name of the output device at the time <see cref="DeviceId"/> was chosen. Windows endpoint IDs can
+    /// rotate (driver reinstall, USB re-enumeration), so this lets us re-bind a profile to the same physical device.
+    /// </summary>
+    public string? DeviceFriendlyName { get; set; }
+
+    /// <summary>
+    /// Adapter / device-interface name of the output device (e.g. "HyperX Cloud Alpha S Game"). More stable than
+    /// <see cref="DeviceFriendlyName"/>, which changes if the user renames the endpoint in Sound settings.
+    /// </summary>
+    public string? DeviceDescription { get; set; }
+
+    /// <summary>Sets the endpoint id plus the stable identity fields so the profile can survive id rotation.</summary>
+    public void SetDevice(string deviceId, string? deviceFriendlyName, string? deviceDescription = null)
+    {
+        DeviceId = deviceId;
+        if (!string.IsNullOrWhiteSpace(deviceFriendlyName))
+            DeviceFriendlyName = deviceFriendlyName;
+        if (!string.IsNullOrWhiteSpace(deviceDescription))
+            DeviceDescription = deviceDescription;
+    }
+
+    /// <summary>
+    /// Re-point this profile at a live device when its stored endpoint id no longer exists.
+    /// Match order: exact id → friendly name + description → friendly name → description (only if unique).
+    /// </summary>
+    public DeviceReconcileResult TryReconcileDevice(IReadOnlyList<DeviceIdentity> devices)
+    {
+        if (devices.Count == 0)
+            return DeviceReconcileResult.Unchanged;
+
+        var exact = devices.FirstOrDefault(d => string.Equals(d.Id, DeviceId, StringComparison.OrdinalIgnoreCase));
+        if (exact != null)
+        {
+            // Id is fine; opportunistically backfill identity fields for configs saved by older builds.
+            bool changed = false;
+            if (string.IsNullOrWhiteSpace(DeviceFriendlyName) && !string.IsNullOrWhiteSpace(exact.FriendlyName))
+            {
+                DeviceFriendlyName = exact.FriendlyName;
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(DeviceDescription) && !string.IsNullOrWhiteSpace(exact.Description))
+            {
+                DeviceDescription = exact.Description;
+                changed = true;
+            }
+            return changed ? DeviceReconcileResult.Backfilled : DeviceReconcileResult.Unchanged;
+        }
+
+        bool hasName = !string.IsNullOrWhiteSpace(DeviceFriendlyName);
+        bool hasDesc = !string.IsNullOrWhiteSpace(DeviceDescription);
+        if (!hasName && !hasDesc)
+            return DeviceReconcileResult.Orphaned;
+
+        DeviceIdentity? match = null;
+
+        if (hasName && hasDesc)
+            match = devices.FirstOrDefault(d => NameEquals(d.FriendlyName, DeviceFriendlyName) && NameEquals(d.Description, DeviceDescription));
+
+        if (match == null && hasName)
+            match = devices.FirstOrDefault(d => NameEquals(d.FriendlyName, DeviceFriendlyName));
+
+        if (match == null && hasDesc)
+        {
+            var byDesc = devices.Where(d => NameEquals(d.Description, DeviceDescription)).ToList();
+            if (byDesc.Count == 1)
+                match = byDesc[0];
+        }
+
+        if (match == null)
+            return DeviceReconcileResult.Orphaned;
+
+        SetDevice(match.Id, match.FriendlyName, match.Description);
+        return DeviceReconcileResult.Rematched;
+    }
+
+    static bool NameEquals(string? a, string? b) =>
+        !string.IsNullOrWhiteSpace(a) && string.Equals(a.Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+
     public string GetAutoDisplayName(string? deviceFriendlyName)
     {
+        if (!HasTarget)
+            return "New profile";
+
         string keys = Hotkeys.Length == 0
             ? "(no hotkeys)"
             : string.Join(" + ", Hotkeys.Select(KeyDisplayNames.GetDisplayName));
