@@ -22,13 +22,16 @@ jobs:
       run:
         shell: pwsh
         working-directory: rust
+    env:
+      # Use the toolchain's bundled MinGW linker, not whatever gcc the runner has on PATH.
+      RUSTFLAGS: -C link-self-contained=yes
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # rust/rust-toolchain.toml pins stable-x86_64-pc-windows-gnu (ships its own linker); rustup installs it here.
+      # The GNU host toolchain ships its own linker; this is the configuration the release exe is built and tested with.
       - name: Install Rust toolchain
-        run: rustup toolchain install
+        run: rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
 
       - name: Get version from Cargo.toml
         id: version
@@ -38,13 +41,14 @@ jobs:
           "version=$($m.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
 
       - name: Test
-        run: cargo test --locked
+        run: cargo +stable-x86_64-pc-windows-gnu test --locked
 
       - name: Build release
-        run: cargo build --release --locked
+        run: cargo +stable-x86_64-pc-windows-gnu build --release --locked
 
       - name: Check the exe is standalone and versioned
         run: |
+          ./tools/check-imports.ps1 -Path target\release\KBMixer.exe
           $exe = Get-Item target\release\KBMixer.exe
           $v = $exe.VersionInfo.FileVersion
           if ($v -ne "${{ steps.version.outputs.version }}.0") { throw "Embedded FileVersion '$v' does not match Cargo.toml" }

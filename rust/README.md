@@ -14,12 +14,14 @@ It reads and writes the same profiles in `%APPDATA%\KBMixer\{id}.json`, byte-for
 ## Build
 
 ```powershell
-rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal   # once; pinned by rust-toolchain.toml
+rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal   # once
+rustup override set stable-x86_64-pc-windows-gnu                         # once, inside rust/
 cargo build --release      # target\release\KBMixer.exe
 cargo test
+.\tools\check-imports.ps1 -Path target\release\KBMixer.exe               # confirms only system DLLs are imported
 ```
 
-The GNU toolchain is pinned because it ships its own linker; the code also builds on `x86_64-pc-windows-msvc` when the Visual Studio C++ tools are installed. `build.rs` compiles the icon, version info and manifest with the Windows SDK's `rc.exe`. For GNU it also converts the `.res` to a COFF object itself, so `windres` isn't needed.
+Releases are built with the GNU toolchain because it ships its own linker (CI runs `cargo +stable-x86_64-pc-windows-gnu`). The code also builds on `x86_64-pc-windows-msvc` when the Visual Studio C++ tools are installed; `.cargo/config.toml` links the CRT statically there, so that build has no VC++ redistributable dependency either. `build.rs` compiles the icon, version info and manifest with the Windows SDK's `rc.exe`. For GNU it also converts the `.res` to a COFF object itself, so `windres` isn't needed.
 
 ## Layout
 
