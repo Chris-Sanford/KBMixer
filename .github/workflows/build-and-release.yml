@@ -1,5 +1,5 @@
 # Build and publish a Windows release on every push to main.
-# Uses GITHUB_TOKEN (no extra secrets). Release tag: v{csproj-version}-r{run_number}.
+# Uses GITHUB_TOKEN (no extra secrets). Release tag: v{rust/Cargo.toml version}-r{run_number}.
 
 name: Build and release
 
@@ -18,52 +18,42 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: rust
+    env:
+      # Use the toolchain's bundled MinGW linker, not whatever gcc the runner has on PATH.
+      RUSTFLAGS: -C link-self-contained=yes
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
+      # The GNU host toolchain ships its own linker; this is the configuration the release exe is built and tested with.
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
 
-      - name: Get version from project
+      - name: Get version from Cargo.toml
         id: version
         run: |
-          $lines = dotnet msbuild KBMixer\KBMixer.csproj -getProperty:Version -nologo
-          $v = ($lines | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1).Trim()
-          if ([string]::IsNullOrWhiteSpace($v)) { throw "Could not read Version from KBMixer.csproj" }
-          "version=$v" >> $env:GITHUB_OUTPUT
+          $m = Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          if (-not $m) { throw "Could not read version from rust/Cargo.toml" }
+          "version=$($m.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
 
-      - name: Publish self-contained single file (Release, win-x64)
-        run: >
-          dotnet publish KBMixer\KBMixer.csproj
-          -c Release
-          -o "${{ github.workspace }}\artifacts\publish"
-          -p:PublishSingleFile=true
-          -p:SelfContained=true
-          -p:WindowsAppSDKSelfContained=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:IncludeAllContentForSelfExtract=true
-          --verbosity minimal
+      - name: Test
+        run: cargo +stable-x86_64-pc-windows-gnu test --locked
 
-      - name: Publish framework-dependent (Release, win-x64)
-        run: >
-          dotnet publish KBMixer\KBMixer.csproj
-          -c Release
-          -o "${{ github.workspace }}\artifacts\publish-fd"
-          -p:SelfContained=false
-          -p:WindowsAppSDKSelfContained=false
-          -p:PublishReadyToRun=false
-          -p:PublishSingleFile=false
-          --verbosity minimal
+      - name: Build release
+        run: cargo +stable-x86_64-pc-windows-gnu build --release --locked
 
-      - name: Zip framework-dependent publish
-        run: >
-          Compress-Archive
-          -Path "${{ github.workspace }}\artifacts\publish-fd\*"
-          -DestinationPath "${{ github.workspace }}\artifacts\KBMixer-framework-dependent.zip"
-          -Force
+      - name: Check the exe is standalone and versioned
+        run: |
+          ./tools/check-imports.ps1 -Path target\release\KBMixer.exe
+          $exe = Get-Item target\release\KBMixer.exe
+          $v = $exe.VersionInfo.FileVersion
+          if ($v -ne "${{ steps.version.outputs.version }}.0") { throw "Embedded FileVersion '$v' does not match Cargo.toml" }
+          "KBMixer.exe: $($exe.Length) bytes, FileVersion $v"
+          "sha256=$((Get-FileHash $exe -Algorithm SHA256).Hash)" >> $env:GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -73,13 +63,10 @@ jobs:
           body: |
             Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `main`.
 
-            **Downloads (win-x64):**
+            **Download:** `KBMixer.exe` (win-x64) is a single self-contained executable with no dependencies. It runs on any 64-bit Windows 10/11 machine with nothing else installed. Profiles in `%APPDATA%\KBMixer` carry over from earlier versions.
 
-            - `KBMixer.exe` — **self-contained single-file** publish. Runs on a 64-bit Windows 10 1903+ machine with nothing else installed; dependencies are extracted to a temporary directory on first launch.
-            - `KBMixer-framework-dependent.zip` — **framework-dependent** publish. Much smaller and starts faster, but requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) and the [Windows App SDK 2.5 runtime](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) to be installed. Unzip anywhere and run `KBMixer.exe`.
-          files: |
-            artifacts/publish/KBMixer.exe
-            artifacts/KBMixer-framework-dependent.zip
+            SHA-256: `${{ env.sha256 }}`
+          files: rust/target/release/KBMixer.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

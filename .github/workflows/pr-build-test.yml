@@ -27,3 +27,34 @@ jobs:
 
       - name: Test
         run: dotnet test KBMixer.Tests\KBMixer.Tests.csproj -c Release --no-build --verbosity minimal
+
+  rust:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: rust
+    env:
+      # Use the toolchain's bundled MinGW linker, not whatever gcc the runner has on PATH.
+      RUSTFLAGS: -C link-self-contained=yes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+
+      - name: Test
+        run: cargo +stable-x86_64-pc-windows-gnu test --locked
+
+      - name: Build release
+        run: cargo +stable-x86_64-pc-windows-gnu build --release --locked
+
+      - name: Check the exe imports only system DLLs
+        run: ./tools/check-imports.ps1 -Path target\release\KBMixer.exe
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: KBMixer-rust
+          path: rust/target/release/KBMixer.exe

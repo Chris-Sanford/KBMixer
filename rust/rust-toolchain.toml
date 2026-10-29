@@ -1,0 +1,7 @@
+[toolchain]
+# Rustup rejects a host triple here, so the GNU host is chosen per checkout instead:
+#   rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+#   rustup override set stable-x86_64-pc-windows-gnu      (run inside rust/)
+# CI calls `cargo +stable-x86_64-pc-windows-gnu` explicitly. MSVC hosts work too (see .cargo/config.toml).
+channel = "stable"
+profile = "minimal"
