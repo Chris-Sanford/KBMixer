@@ -27,3 +27,28 @@ jobs:
 
       - name: Test
         run: dotnet test KBMixer.Tests\KBMixer.Tests.csproj -c Release --no-build --verbosity minimal
+
+  rust:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: rust
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Build release
+        run: cargo build --release --locked
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: KBMixer-rust
+          path: rust/target/release/KBMixer.exe
