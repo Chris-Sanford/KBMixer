@@ -41,6 +41,12 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
     /// <summary>Tracks when the user last interacted with this row's slider to suppress sync.</summary>
     internal long LastUserInteractionTicks { get; set; }
 
+    /// <summary>
+    /// The percent the audio endpoint is known to be at (last read or last written). Slider ValueChanged events that
+    /// match it are the binding echoing a sync, not the user, and must not be written back to the audio session.
+    /// </summary>
+    internal double KnownAudioPercent { get; set; }
+
     public bool IsHotkeyTarget
     {
         get => _isHotkeyTarget;
@@ -102,6 +108,7 @@ public sealed class MixerChannelViewModel : INotifyPropertyChanged
     public void SyncVolumeFromAudio(float scalar)
     {
         scalar = Math.Clamp(scalar, 0f, 1f);
+        KnownAudioPercent = Math.Round(scalar * 100.0, 0);
         if ((int)Math.Round(scalar * 100.0) == (int)Math.Round(_volumeScalar * 100.0))
             return;
         _volumeScalar = scalar;

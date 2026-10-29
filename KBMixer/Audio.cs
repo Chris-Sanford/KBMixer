@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -12,6 +13,34 @@ namespace KBMixer
     {
         public MMDevice MMDevice { get; set; } = null!;
         public AudioApp[] AudioApps { get; set; } = Array.Empty<AudioApp>();
+
+        // Plain copies captured on the audio worker so the UI thread never makes COM calls to read them.
+        public string Id { get; set; } = "";
+        public string FriendlyName { get; set; } = "";
+        public string? Description { get; set; }
+        public float MasterVolume { get; set; }
+        public bool MasterMuted { get; set; }
+
+        public DeviceIdentity? Identity =>
+            string.IsNullOrEmpty(Id) ? null : new DeviceIdentity(Id, FriendlyName, Description);
+    }
+
+    /// <summary>
+    /// Everything KBMixer needs to know about a session, read once (on the audio worker) when the session is enumerated.
+    /// Volume/Muted are refreshed by the worker's poll; the rest never changes for the life of a session object.
+    /// </summary>
+    public sealed class SessionInfo
+    {
+        public uint ProcessId;
+        public bool IsSystemSounds;
+        public string InstanceId = "";
+        public string DisplayName = "";
+        public bool HasIdentity;
+        public string AppFileName = "";
+        public string AppFriendlyName = "";
+        public string? ExePath;
+        public float Volume;
+        public bool Muted;
     }
 
     public class AudioApp // Object class to represnt an audio application controllable by KBMixer
@@ -50,6 +79,56 @@ namespace KBMixer
             public static readonly SessionReferenceEqualityComparer Instance = new();
             public bool Equals(AudioSessionControl? x, AudioSessionControl? y) => ReferenceEquals(x, y);
             public int GetHashCode(AudioSessionControl obj) => RuntimeHelpers.GetHashCode(obj);
+        }
+
+        private static readonly ConditionalWeakTable<AudioSessionControl, SessionInfo> SessionInfos = new();
+
+        /// <summary>
+        /// Cached facts about <paramref name="session"/>. Sessions enumerated by <see cref="AudioWorker"/> are always
+        /// cached, so this is a dictionary lookup on the UI thread. Anything else is read live (tests / diagnostics).
+        /// </summary>
+        public static SessionInfo Info(AudioSessionControl session)
+        {
+            if (SessionInfos.TryGetValue(session, out var info))
+                return info;
+            info = ReadSessionInfo(session);
+            SessionInfos.AddOrUpdate(session, info);
+            return info;
+        }
+
+        private static SessionInfo ReadSessionInfo(AudioSessionControl session)
+        {
+            var info = new SessionInfo();
+            try { info.IsSystemSounds = session.IsSystemSoundsSession; } catch { }
+            try { info.ProcessId = session.GetProcessID; } catch { }
+            try { info.InstanceId = session.GetSessionInstanceIdentifier ?? ""; } catch { }
+            try { info.DisplayName = session.DisplayName ?? ""; } catch { }
+            try
+            {
+                var volume = session.SimpleAudioVolume;
+                info.Volume = volume.Volume;
+                info.Muted = volume.Mute;
+            }
+            catch { }
+            ResolveIdentity(info);
+            return info;
+        }
+
+        private static int CompareSessions(AudioSessionControl a, AudioSessionControl b)
+        {
+            var ia = Info(a);
+            var ib = Info(b);
+            int c = ia.ProcessId.CompareTo(ib.ProcessId);
+            return c != 0 ? c : string.CompareOrdinal(ia.InstanceId, ib.InstanceId);
+        }
+
+        /// <summary>Applies queued wheel notches in order, clamping after each one exactly like one-at-a-time adjustment.</summary>
+        public static float ApplyVolumeSteps(float current, IReadOnlyList<bool> steps, float increment = AudioApp.volumeIncrement)
+        {
+            float v = current;
+            foreach (bool isUp in steps)
+                v = isUp ? Math.Min(1f, v + increment) : Math.Max(0f, v - increment);
+            return v;
         }
 
         /// <summary>Adjust the render endpoint’s master volume (Windows volume mixer level for that device).</summary>
@@ -164,11 +243,7 @@ namespace KBMixer
                     list.Add(session);
             }
 
-            list.Sort(static (a, b) =>
-            {
-                int c = a.GetProcessID.CompareTo(b.GetProcessID);
-                return c != 0 ? c : string.CompareOrdinal(a.GetSessionInstanceIdentifier ?? "", b.GetSessionInstanceIdentifier ?? "");
-            });
+            list.Sort(CompareSessions);
             return list;
         }
 
@@ -201,10 +276,10 @@ namespace KBMixer
 
         public static bool SessionBelongsToConfig(AudioSessionControl session, Config config)
         {
-            if (!TryGetAppIdentity(session, out string appFileName, out string appFriendlyName))
+            var info = Info(session);
+            if (!info.HasIdentity)
                 return false;
-            string disp = (session.DisplayName ?? "").Trim();
-            return SessionMatchesConfig(appFileName, disp, appFriendlyName, config.AppFileName, config.AppFriendlyName);
+            return SessionMatchesConfig(info.AppFileName, info.DisplayName.Trim(), info.AppFriendlyName, config.AppFileName, config.AppFriendlyName);
         }
 
         /// <summary>True when any session in <paramref name="app"/> is the hotkey target described by <paramref name="config"/>.</summary>
@@ -240,24 +315,43 @@ namespace KBMixer
                     continue;
                 }
 
-                if (!TryGetAppIdentity(session, out string appFileName, out string appFriendlyName))
-                    continue;
-
-                string disp = (session.DisplayName ?? "").Trim();
-                if (!SessionMatchesConfig(appFileName, disp, appFriendlyName, config.AppFileName, config.AppFriendlyName))
+                if (!SessionBelongsToConfig(session, config))
                     continue;
 
                 if (seen.Add(session))
                     list.Add(session);
             }
 
-            list.Sort(static (a, b) =>
-            {
-                int c = a.GetProcessID.CompareTo(b.GetProcessID);
-                return c != 0 ? c : string.CompareOrdinal(a.GetSessionInstanceIdentifier ?? "", b.GetSessionInstanceIdentifier ?? "");
-            });
+            list.Sort(CompareSessions);
             return list;
         }
+
+        /// <summary>
+        /// Same as <see cref="CollectSessionsForConfig(MMDevice, Config)"/> but over an already-enumerated snapshot,
+        /// so it makes no COM calls and is safe to run on the UI thread.
+        /// </summary>
+        public static List<AudioSessionControl> CollectSessionsForConfig(AudioDevice device, Config config)
+        {
+            var list = new List<AudioSessionControl>();
+            if (config.ControlDeviceMasterVolume || !config.HasTarget)
+                return list;
+
+            var seen = new HashSet<AudioSessionControl>(SessionReferenceEqualityComparer.Instance);
+            foreach (var app in device.AudioApps)
+            {
+                foreach (var session in app.Sessions)
+                {
+                    if (SessionBelongsToConfig(session, config) && seen.Add(session))
+                        list.Add(session);
+                }
+            }
+
+            list.Sort(CompareSessions);
+            return list;
+        }
+
+        /// <summary>Sorts sessions by process id, then session instance id (the order the session picker shows).</summary>
+        public static void SortSessions(List<AudioSessionControl> sessions) => sessions.Sort(CompareSessions);
 
         /// <summary>Writes every render session on every active device (for debugging / validation).</summary>
         public static string WriteSessionDiagnosticFile()
@@ -295,30 +389,22 @@ namespace KBMixer
         }
 
         /// <summary>
-        /// Cheap, stable fingerprint of "which sessions exist on which devices" (device id + PID + session instance id).
-        /// Used by the refresh timer to detect sessions appearing/disappearing/swapping even when the count is unchanged.
+        /// Stable fingerprint of "which sessions exist on which devices" (device id/name + PID + session instance id +
+        /// display name). The audio worker compares it between scans so the UI is only rebuilt when something changed.
         /// </summary>
-        public static string GetSessionFingerprint(IEnumerable<MMDevice> devices)
+        public static string GetSnapshotFingerprint(IEnumerable<AudioDevice> devices)
         {
             var parts = new List<string>();
             foreach (var dev in devices)
             {
-                string devId;
-                try { devId = dev.ID; } catch { continue; }
-                parts.Add(devId);
-
-                SessionCollection sessions;
-                try { sessions = dev.AudioSessionManager.Sessions; }
-                catch { continue; }
-
-                for (int i = 0; i < sessions.Count; i++)
+                parts.Add($"{dev.Id}|{dev.FriendlyName}");
+                foreach (var app in dev.AudioApps)
                 {
-                    try
+                    foreach (var s in app.Sessions)
                     {
-                        var s = sessions[i];
-                        parts.Add($"{devId}|{s.GetProcessID}|{s.GetSessionInstanceIdentifier}");
+                        var info = Info(s);
+                        parts.Add($"{dev.Id}|{info.ProcessId}|{info.InstanceId}|{info.DisplayName}");
                     }
-                    catch { }
                 }
             }
             parts.Sort(StringComparer.Ordinal);
@@ -342,6 +428,17 @@ namespace KBMixer
             }
         }
 
+        /// <summary>
+        /// Endpoint name + adapter description. Slow: NAudio scans the whole property store for each name
+        /// (~35 ms per property on typical hardware), so callers should cache the result per device id.
+        /// </summary>
+        public static (string FriendlyName, string? Description) ReadDeviceNames(MMDevice device)
+        {
+            string friendly = "";
+            try { friendly = device.FriendlyName ?? ""; } catch { }
+            return (friendly, TryGetDeviceDescription(device));
+        }
+
         /// <summary>Id + friendly name + description for a live endpoint, or null if the device can't be read.</summary>
         public static DeviceIdentity? TryGetDeviceIdentity(MMDevice device)
         {
@@ -358,6 +455,7 @@ namespace KBMixer
             }
         }
 
+        /// <summary>One-off enumeration (tests / diagnostics). The app itself goes through <see cref="AudioWorker"/>.</summary>
         public static AudioDevice[] GetAudioDevices()
         {
             MMDeviceEnumerator enumerator = new MMDeviceEnumerator();
@@ -365,16 +463,45 @@ namespace KBMixer
             List<AudioDevice> audioDevices = new List<AudioDevice>();
             foreach (MMDevice device in devices)
             {
-                audioDevices.Add(new AudioDevice
-                {
-                    MMDevice = device,
-                    AudioApps = GetAudioDeviceApps(device)
-                });
+                var built = BuildAudioDevice(device);
+                if (built != null)
+                    audioDevices.Add(built);
             }
             return audioDevices.ToArray();
         }
 
-        public static AudioApp[] GetAudioDeviceApps(MMDevice device)
+        /// <summary>
+        /// Reads a device and its sessions into plain data. Uses the device's current
+        /// <see cref="AudioSessionManager.Sessions"/>; call <see cref="AudioSessionManager.RefreshSessions"/> first for fresh results.
+        /// </summary>
+        public static AudioDevice? BuildAudioDevice(MMDevice device, (string FriendlyName, string? Description)? knownNames = null)
+        {
+            string id;
+            try { id = device.ID; }
+            catch { return null; }
+            if (string.IsNullOrEmpty(id))
+                return null;
+
+            var built = new AudioDevice { MMDevice = device, Id = id };
+            var names = knownNames ?? ReadDeviceNames(device);
+            built.FriendlyName = names.FriendlyName;
+            built.Description = names.Description;
+            try
+            {
+                var endpoint = device.AudioEndpointVolume;
+                built.MasterVolume = endpoint.MasterVolumeLevelScalar;
+                built.MasterMuted = endpoint.Mute;
+            }
+            catch { }
+
+            try { built.AudioApps = GetAudioDeviceApps(device, id); }
+            catch (Exception ex) { Debug.WriteLine($"BuildAudioDevice({id}): {ex.Message}"); }
+            return built;
+        }
+
+        public static AudioApp[] GetAudioDeviceApps(MMDevice device) => GetAudioDeviceApps(device, device.ID);
+
+        private static AudioApp[] GetAudioDeviceApps(MMDevice device, string deviceId)
         {
             List<AudioApp> audioApps = new List<AudioApp>();
 
@@ -400,8 +527,7 @@ namespace KBMixer
                 // casing). Merge into one AudioApp per device so session indices match the volume mixer and
                 // we do not run AdjustVolume once per duplicate row.
                 string mergeKey = NormalizeAppFileKey(appFileName);
-                var existingApp = audioApps.FirstOrDefault(a =>
-                    a.DeviceId == device.ID && NormalizeAppFileKey(a.AppFileName) == mergeKey);
+                var existingApp = audioApps.FirstOrDefault(a => NormalizeAppFileKey(a.AppFileName) == mergeKey);
 
                 if (existingApp != null)
                 {
@@ -416,18 +542,12 @@ namespace KBMixer
                 {
                     audioApps.Add(new AudioApp
                     {
-                        DeviceId = device.ID,
+                        DeviceId = deviceId,
                         AppFriendlyName = appFriendlyName,
                         AppFileName = appFileName,
                         Sessions = new List<AudioSessionControl> { session }
                     });
                 }
-            }
-
-            // Debug write the fields of all audio apps
-            foreach (var app in audioApps)
-            {
-                Debug.WriteLine($"DeviceId: {app.DeviceId}, AppFriendlyName: {app.AppFriendlyName}, AppFileName: {app.AppFileName}, SessionsCount: {app.Sessions.Count}");
             }
 
             return audioApps.ToArray();
@@ -452,77 +572,157 @@ namespace KBMixer
 
         private static bool TryGetAppIdentity(AudioSessionControl session, out string appFileName, out string appFriendlyName)
         {
-            appFileName = "";
-            appFriendlyName = "";
+            var info = Info(session);
+            appFileName = info.AppFileName;
+            appFriendlyName = info.AppFriendlyName;
+            return info.HasIdentity;
+        }
 
+        private static void ResolveIdentity(SessionInfo info)
+        {
             try
             {
-                if (session.IsSystemSoundsSession)
+                if (info.IsSystemSounds)
                 {
-                    appFileName = systemSoundsId;
-                    appFriendlyName = "System Sounds";
-                    return true;
+                    info.AppFileName = systemSoundsId;
+                    info.AppFriendlyName = "System Sounds";
+                    info.HasIdentity = true;
+                    return;
                 }
 
-                uint pid = session.GetProcessID;
-                if (pid != 0)
+                if (info.ProcessId != 0 && GetProcessImage(info.ProcessId, info.InstanceId) is { } image)
                 {
-                    try
-                    {
-                        using Process proc = Process.GetProcessById((int)pid);
-                        string? exePath = null;
-                        try
-                        {
-                            exePath = proc.MainModule?.FileName;
-                        }
-                        catch
-                        {
-                            // Some sessions are elevated or protected; ProcessName still works for volume routing.
-                        }
+                    string appFileName = !string.IsNullOrEmpty(image.ExePath)
+                        ? Path.GetFileName(image.ExePath)
+                        : EnsureExeSuffix(image.ProcessName ?? "");
 
-                        appFileName = !string.IsNullOrEmpty(exePath)
-                            ? Path.GetFileName(exePath)
-                            : EnsureExeSuffix(proc.ProcessName);
+                    if (string.IsNullOrEmpty(appFileName))
+                        return;
 
-                        if (string.IsNullOrEmpty(appFileName))
-                            return false;
-
-                        string display = session.DisplayName ?? "";
-                        if (!string.IsNullOrWhiteSpace(display) && !LooksLikeResourceReference(display))
-                            appFriendlyName = display.Trim();
-                        else
-                            appFriendlyName = GetFileDescription(exePath) ?? Path.GetFileNameWithoutExtension(appFileName);
-                        return true;
-                    }
-                    catch
-                    {
-                        // Process may have exited between enumeration and lookup.
-                    }
+                    string display = info.DisplayName;
+                    info.AppFileName = appFileName;
+                    info.AppFriendlyName = !string.IsNullOrWhiteSpace(display) && !LooksLikeResourceReference(display)
+                        ? display.Trim()
+                        : GetFileDescription(image.ExePath) ?? Path.GetFileNameWithoutExtension(appFileName);
+                    info.ExePath = image.ExePath;
+                    info.HasIdentity = true;
+                    return;
                 }
 
-                string displayName = (session.DisplayName ?? "").Trim();
-                if (TryParseExeFromSessionInstanceId(session.GetSessionInstanceIdentifier, out string parsedExe))
+                string displayName = info.DisplayName.Trim();
+                if (TryParseExeFromSessionInstanceId(info.InstanceId, out string parsedExe))
                 {
-                    appFileName = parsedExe;
-                    appFriendlyName = !string.IsNullOrEmpty(displayName)
+                    info.AppFileName = parsedExe;
+                    info.AppFriendlyName = !string.IsNullOrEmpty(displayName)
                         ? displayName
                         : Path.GetFileNameWithoutExtension(parsedExe);
-                    return true;
+                    info.HasIdentity = true;
+                    return;
                 }
 
                 if (!string.IsNullOrEmpty(displayName))
                 {
-                    appFileName = displayName;
-                    appFriendlyName = displayName;
-                    return true;
+                    info.AppFileName = displayName;
+                    info.AppFriendlyName = displayName;
+                    info.HasIdentity = true;
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"TryGetAppIdentity failed: {ex.Message}");
+                Debug.WriteLine($"ResolveIdentity failed: {ex.Message}");
+            }
+        }
+
+        private sealed record ProcessImage(string? ExePath, string? ProcessName);
+
+        // Keyed by session instance id (it embeds the PID), so a recycled PID never reuses a stale entry.
+        private static readonly Dictionary<string, ProcessImage?> ProcessImageCache = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Executable path for a session's process. Uses <c>QueryFullProcessImageName</c> with
+        /// <c>PROCESS_QUERY_LIMITED_INFORMATION</c>, which works for elevated and anti-cheat protected games and does not
+        /// walk the target's module list the way <see cref="Process.MainModule"/> does. Null if the process is gone.
+        /// </summary>
+        private static ProcessImage? GetProcessImage(uint pid, string instanceId)
+        {
+            string key = string.IsNullOrEmpty(instanceId) ? "pid:" + pid : instanceId;
+            lock (ProcessImageCache)
+            {
+                if (ProcessImageCache.TryGetValue(key, out var cached))
+                    return cached;
             }
 
-            return false;
+            ProcessImage? image = null;
+            string? path = TryQueryProcessImagePath(pid);
+            if (path != null)
+            {
+                image = new ProcessImage(path, null);
+            }
+            else
+            {
+                try
+                {
+                    using Process proc = Process.GetProcessById((int)pid);
+                    image = new ProcessImage(null, proc.ProcessName);
+                }
+                catch
+                {
+                    // Process may have exited between enumeration and lookup.
+                }
+            }
+
+            lock (ProcessImageCache)
+                ProcessImageCache[key] = image;
+            return image;
+        }
+
+        /// <summary>Drops cached process lookups for sessions that no longer exist.</summary>
+        public static void RetainProcessImageCache(IEnumerable<AudioDevice> devices)
+        {
+            var live = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var dev in devices)
+                foreach (var app in dev.AudioApps)
+                    foreach (var s in app.Sessions)
+                    {
+                        var info = Info(s);
+                        live.Add(string.IsNullOrEmpty(info.InstanceId) ? "pid:" + info.ProcessId : info.InstanceId);
+                    }
+
+            lock (ProcessImageCache)
+            {
+                foreach (var key in ProcessImageCache.Keys.Where(k => !live.Contains(k)).ToList())
+                    ProcessImageCache.Remove(key);
+            }
+        }
+
+        private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, [Out] char[] exeName, ref uint size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        private static string? TryQueryProcessImagePath(uint pid)
+        {
+            IntPtr handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (handle == IntPtr.Zero)
+                return null;
+            try
+            {
+                var buffer = new char[1024];
+                uint size = (uint)buffer.Length;
+                return QueryFullProcessImageName(handle, 0, buffer, ref size) && size > 0
+                    ? new string(buffer, 0, (int)size)
+                    : null;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
         }
 
         private static readonly Dictionary<string, string?> FileDescriptionCache = new(StringComparer.OrdinalIgnoreCase);

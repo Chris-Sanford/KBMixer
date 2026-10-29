@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using Microsoft.UI.Xaml.Media;
@@ -16,36 +15,33 @@ internal static class ProcessIconHelper
         return TryGetIconForSession(app.Sessions[0]);
     }
 
+    // UI thread only. One entry per executable; null means "no icon available" so it isn't retried on every rebuild.
+    static readonly Dictionary<string, ImageSource?> IconsByExePath = new(StringComparer.OrdinalIgnoreCase);
+
     public static ImageSource? TryGetIconForSession(AudioSessionControl session)
     {
+        var info = Audio.Info(session);
+        if (info.IsSystemSounds || info.ProcessId == 0 || string.IsNullOrEmpty(info.ExePath))
+            return null;
+
+        string exePath = info.ExePath;
+        if (IconsByExePath.TryGetValue(exePath, out var cached))
+            return cached;
+
+        ImageSource? icon = null;
         try
         {
-            if (session.IsSystemSoundsSession)
-                return null;
-        }
-        catch { return null; }
-
-        try
-        {
-            uint pid = session.GetProcessID;
-            if (pid == 0)
-                return null;
-
-            using var proc = Process.GetProcessById((int)pid);
-            string? exePath = null;
-            try { exePath = proc.MainModule?.FileName; }
-            catch { }
-
-            if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+            if (File.Exists(exePath))
             {
                 using var sysIcon = Icon.ExtractAssociatedIcon(exePath);
                 if (sysIcon is not null)
-                    return AppIconHelper.ToImageSource(sysIcon, Path.GetFileNameWithoutExtension(exePath));
+                    icon = AppIconHelper.ToImageSource(sysIcon, Path.GetFileNameWithoutExtension(exePath));
             }
         }
         catch { }
 
-        return null;
+        IconsByExePath[exePath] = icon;
+        return icon;
     }
 
     /// <summary>Finds an icon for an app by friendly name from the current session list.</summary>
