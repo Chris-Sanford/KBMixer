@@ -1,6 +1,6 @@
 [package]
 name = "kbmixer"
-version = "2.1.2"
+version = "3.0.0"
 edition = "2021"
 description = "Keyboard and Mouse Audio Mixer - Control application volume with hotkeys and mouse wheel"
 license = "MIT"
